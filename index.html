@@ -1,10 +1,11 @@
+```html
 <!DOCTYPE html>
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>Quantum Random Walk</title>
+  <title>Quantum Random Experiments</title>
 
   <style>
     :root {
@@ -26,9 +27,69 @@
     }
 
     .app {
-      width: min(92vw, 780px);
+      width: min(94vw, 820px);
       display: grid;
       gap: 14px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .choice-screen {
+      min-height: 620px;
+      display: grid;
+      place-items: center;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      padding: 30px;
+    }
+
+    .choice-panel {
+      width: min(100%, 620px);
+      display: grid;
+      gap: 24px;
+      text-align: center;
+    }
+
+    .choice-panel h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 5vw, 3rem);
+    }
+
+    .choice-panel p {
+      margin: 0;
+      color: #8b949e;
+    }
+
+    .choice-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .choice-button {
+      min-height: 150px;
+      padding: 20px;
+      display: grid;
+      place-items: center;
+      gap: 8px;
+      background: #21262d;
+      border: 1px solid #484f58;
+      border-radius: 14px;
+      color: #f0f6fc;
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+
+    .choice-button:hover {
+      background: #30363d;
+      border-color: #58a6ff;
+    }
+
+    .choice-icon {
+      font-size: 2.6rem;
     }
 
     .toolbar {
@@ -50,6 +111,10 @@
 
     button.secondary {
       background: #30363d;
+    }
+
+    button.danger {
+      background: #8b2c2c;
     }
 
     button:hover {
@@ -74,10 +139,21 @@
     .info {
       display: flex;
       justify-content: space-between;
-      gap: 15px;
+      gap: 14px;
       flex-wrap: wrap;
       font-size: 0.85rem;
-      opacity: 0.75;
+      opacity: 0.76;
+    }
+
+    @media (max-width: 650px) {
+      .choice-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .status {
+        width: 100%;
+        margin-left: 0;
+      }
     }
   </style>
 </head>
@@ -85,37 +161,67 @@
 <body>
   <main class="app">
 
-    <div class="toolbar">
-      <button id="startButton">Start</button>
+    <section id="choiceScreen" class="choice-screen">
+      <div class="choice-panel">
+        <div>
+          <h1>Quantum-experiment</h1>
+          <p>Kies een visualisatie.</p>
+        </div>
 
-      <button
-        id="restartButton"
-        class="secondary"
-      >
-        Herstart
-      </button>
+        <div class="choice-buttons">
+          <button id="chooseWalkButton" class="choice-button">
+            <span class="choice-icon">〰️</span>
+            <strong>Random Walk</strong>
+            <small>Quantum-random richtingen</small>
+          </button>
 
-      <span
-        id="status"
-        class="status"
-      >
-        Quantumdata laden…
-      </span>
-    </div>
+          <button id="chooseWaterfallButton" class="choice-button">
+            <span class="choice-icon">🔵</span>
+            <strong>Knikkerwaterval</strong>
+            <small>Quantum links/rechts-keuzes</small>
+          </button>
+        </div>
 
-    <canvas
-      id="arena"
-      width="720"
-      height="720"
-    ></canvas>
+        <span id="choiceStatus">
+          Quantumdata wordt geladen…
+        </span>
+      </div>
+    </section>
 
-    <div class="info">
-      <span id="bufferInfo">Buffer: 0</span>
-      <span id="stepInfo">Stappen: 0</span>
-      <span id="requestInfo">Nog geen request</span>
-      <span id="versionInfo">Versie 1.2.0</span>
-      <span id="deployInfo">Deploy: 2026-07-11</span>
-    </div>
+    <section id="experimentScreen" class="hidden">
+
+      <div class="toolbar">
+        <button id="startButton">Start</button>
+
+        <button id="restartButton" class="secondary">
+          Herstart
+        </button>
+
+        <button id="menuButton" class="danger">
+          Menu
+        </button>
+
+        <span id="status" class="status">
+          Quantumdata laden…
+        </span>
+      </div>
+
+      <canvas
+        id="arena"
+        width="720"
+        height="720"
+      ></canvas>
+
+      <div class="info">
+        <span id="modeInfo">Modus: —</span>
+        <span id="bufferInfo">Buffer: 0</span>
+        <span id="counterInfo">Stappen: 0</span>
+        <span id="requestInfo">Nog geen batch</span>
+        <span>Versie 1.3.0</span>
+        <span>Deploy: 2026-07-11</span>
+      </div>
+
+    </section>
 
   </main>
 
@@ -126,31 +232,39 @@
       "https://qrng.anu.edu.au/API/jsonI.php" +
       "?length=1024&type=uint16";
 
-    /*
-      Niet vaker dan één normaal request per minuut.
-    */
     const MIN_REQUEST_INTERVAL = 60_000;
-
-    /*
-      Na een mislukking 90 seconden wachten.
-    */
     const RETRY_INTERVAL = 90_000;
-
-    /*
-      Nieuwe batch aanvragen wanneer nog 600
-      getallen in de buffer zitten.
-    */
     const PREFETCH_THRESHOLD = 600;
 
-    const STEPS_PER_SECOND = 10;
-    const STEP_INTERVAL = 1000 / STEPS_PER_SECOND;
-    const STEP_LENGTH = 10;
+    const WALK_STEPS_PER_SECOND = 10;
+    const WALK_STEP_INTERVAL =
+      1000 / WALK_STEPS_PER_SECOND;
 
-    const canvas =
-      document.getElementById("arena");
+    const WALK_STEP_LENGTH = 10;
 
-    const context =
-      canvas.getContext("2d");
+    const BALL_SPAWN_INTERVAL = 700;
+    const BALL_SPEED = 3.4;
+    const BALL_RADIUS = 5;
+
+    const PEG_ROWS = 12;
+    const PEG_HORIZONTAL_SPACING = 48;
+    const PEG_VERTICAL_SPACING = 42;
+    const PEG_RADIUS = 4;
+
+    const choiceScreen =
+      document.getElementById("choiceScreen");
+
+    const experimentScreen =
+      document.getElementById("experimentScreen");
+
+    const chooseWalkButton =
+      document.getElementById("chooseWalkButton");
+
+    const chooseWaterfallButton =
+      document.getElementById("chooseWaterfallButton");
+
+    const choiceStatus =
+      document.getElementById("choiceStatus");
 
     const startButton =
       document.getElementById("startButton");
@@ -158,28 +272,34 @@
     const restartButton =
       document.getElementById("restartButton");
 
+    const menuButton =
+      document.getElementById("menuButton");
+
     const statusElement =
       document.getElementById("status");
+
+    const modeInfo =
+      document.getElementById("modeInfo");
 
     const bufferInfo =
       document.getElementById("bufferInfo");
 
-    const stepInfo =
-      document.getElementById("stepInfo");
+    const counterInfo =
+      document.getElementById("counterInfo");
 
     const requestInfo =
       document.getElementById("requestInfo");
 
+    const canvas =
+      document.getElementById("arena");
+
+    const context =
+      canvas.getContext("2d");
+
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
 
-    const walker = {
-      x: WIDTH / 2,
-      y: HEIGHT / 2,
-      trail: [],
-      steps: 0
-    };
-
+    let currentMode = null;
     let running = false;
     let wasRunningBeforeEmpty = false;
 
@@ -193,13 +313,35 @@
     let animationFrame = null;
     let previousFrameTime = 0;
     let accumulatedTime = 0;
+    let ballSpawnAccumulator = 0;
+
+    const walker = {
+      x: WIDTH / 2,
+      y: HEIGHT / 2,
+      trail: [],
+      steps: 0
+    };
+
+    const waterfall = {
+      balls: [],
+      pegs: [],
+      bins: [],
+      completedBalls: 0
+    };
 
     function updateInterface() {
       bufferInfo.textContent =
         `Buffer: ${quantumBuffer.length}`;
 
-      stepInfo.textContent =
-        `Stappen: ${walker.steps}`;
+      if (currentMode === "walk") {
+        counterInfo.textContent =
+          `Stappen: ${walker.steps}`;
+      }
+
+      if (currentMode === "waterfall") {
+        counterInfo.textContent =
+          `Knikkers: ${waterfall.completedBalls}`;
+      }
 
       if (lastSuccessfulRequest > 0) {
         const time =
@@ -208,17 +350,21 @@
         requestInfo.textContent =
           `Laatste batch: ${time.toLocaleTimeString()}`;
       }
+
+      choiceStatus.textContent =
+        quantumBuffer.length > 0
+          ? `Quantumdata gereed · buffer ${quantumBuffer.length}`
+          : requestBusy
+            ? "Quantumdata ophalen…"
+            : "Wachten op quantumdata…";
     }
 
     function scheduleRetry() {
       clearTimeout(retryTimer);
 
-      statusElement.textContent =
-        quantumBuffer.length > 0
-          ? "QRNG-fout · buffer nog actief"
-          : "QRNG-fout · nieuwe poging over 90 seconden";
-
       retryTimer = setTimeout(async () => {
+        retryTimer = null;
+
         const success =
           await fetchQuantumBatch(true);
 
@@ -237,10 +383,6 @@
         return false;
       }
 
-      /*
-        Normale prefetch respecteert de minimale
-        tijd sinds het laatste succesvolle request.
-      */
       if (
         !forceRetry &&
         lastSuccessfulRequest > 0 &&
@@ -250,10 +392,6 @@
         return false;
       }
 
-      /*
-        Ook geforceerde retries mogen niet sneller
-        dan RETRY_INTERVAL plaatsvinden.
-      */
       if (
         forceRetry &&
         lastRequestAttempt > 0 &&
@@ -269,6 +407,8 @@
       statusElement.textContent =
         "Quantumdata ophalen…";
 
+      updateInterface();
+
       try {
         const requestUrl =
           `${QRNG_URL}&timestamp=${Date.now()}`;
@@ -276,7 +416,6 @@
         const response = await fetch(
           requestUrl,
           {
-            method: "GET",
             cache: "no-store"
           }
         );
@@ -308,24 +447,22 @@
           Date.now();
 
         clearTimeout(retryTimer);
-
-        updateInterface();
+        retryTimer = null;
 
         statusElement.textContent =
           running
-            ? "Quantum walk actief"
+            ? "Experiment actief"
             : "Quantumdata gereed";
 
-        /*
-          Automatisch hervatten wanneer de walk
-          door een lege buffer was gestopt.
-        */
+        updateInterface();
+
         if (
           wasRunningBeforeEmpty &&
-          !running
+          !running &&
+          currentMode !== null
         ) {
           wasRunningBeforeEmpty = false;
-          startWalk();
+          startExperiment();
         }
 
         return true;
@@ -336,20 +473,23 @@
           error
         );
 
+        statusElement.textContent =
+          quantumBuffer.length > 0
+            ? "QRNG-fout · buffer nog actief"
+            : "QRNG-fout · retry gepland";
+
         scheduleRetry();
+        updateInterface();
 
         return false;
 
       } finally {
         requestBusy = false;
+        updateInterface();
       }
     }
 
     function checkBuffer() {
-      /*
-        Ruim voor de buffer leeg is een nieuwe
-        batch aanvragen.
-      */
       if (
         quantumBuffer.length <=
         PREFETCH_THRESHOLD &&
@@ -358,10 +498,6 @@
         fetchQuantumBatch(false);
       }
 
-      /*
-        Wanneer de buffer leeg is en geen retry
-        gepland staat, plan dan een retry.
-      */
       if (
         quantumBuffer.length === 0 &&
         !requestBusy &&
@@ -371,7 +507,7 @@
       }
     }
 
-    function getQuantumDirection() {
+    function takeQuantumNumber() {
       checkBuffer();
 
       if (quantumBuffer.length === 0) {
@@ -384,52 +520,59 @@
       updateInterface();
       checkBuffer();
 
-      /*
-        Zet uint16 om naar een hoek
-        tussen 0 en 360 graden.
-      */
-      return (
-        value / 65536
-      ) * Math.PI * 2;
+      return value;
     }
 
-    function performStep() {
-      const angle =
-        getQuantumDirection();
+    function stopForEmptyBuffer() {
+      wasRunningBeforeEmpty = running;
+      running = false;
 
-      if (angle === null) {
-        wasRunningBeforeEmpty = running;
-        running = false;
+      cancelAnimationFrame(
+        animationFrame
+      );
 
-        cancelAnimationFrame(
-          animationFrame
-        );
+      startButton.textContent =
+        "Start";
 
-        startButton.textContent =
-          "Start";
+      statusElement.textContent =
+        "Buffer leeg · wachten op quantumdata…";
 
-        statusElement.textContent =
-          "Buffer leeg · wachten op quantumdata…";
+      scheduleRetry();
+    }
 
-        scheduleRetry();
+    function resetWalk() {
+      walker.x = WIDTH / 2;
+      walker.y = HEIGHT / 2;
+      walker.trail = [];
+      walker.steps = 0;
+    }
 
+    function performWalkStep() {
+      const quantumValue =
+        takeQuantumNumber();
+
+      if (quantumValue === null) {
+        stopForEmptyBuffer();
         return;
       }
+
+      const angle =
+        quantumValue /
+        65536 *
+        Math.PI *
+        2;
 
       const oldX = walker.x;
       const oldY = walker.y;
 
       walker.x +=
         Math.cos(angle) *
-        STEP_LENGTH;
+        WALK_STEP_LENGTH;
 
       walker.y +=
         Math.sin(angle) *
-        STEP_LENGTH;
+        WALK_STEP_LENGTH;
 
-      /*
-        Reflecterende randen.
-      */
       if (walker.x < 0) {
         walker.x = -walker.x;
       }
@@ -458,13 +601,11 @@
       });
 
       walker.steps++;
-
       updateInterface();
     }
 
-    function drawArena() {
-      context.fillStyle =
-        "#010409";
+    function drawWalk() {
+      context.fillStyle = "#010409";
 
       context.fillRect(
         0,
@@ -493,7 +634,8 @@
 
         const alpha =
           0.2 +
-          relativeAge * 0.75;
+          relativeAge *
+          0.75;
 
         context.strokeStyle =
           `rgba(88,166,255,${alpha})`;
@@ -513,8 +655,7 @@
         context.stroke();
       }
 
-      context.fillStyle =
-        "#f2cc60";
+      context.fillStyle = "#f2cc60";
 
       context.beginPath();
 
@@ -529,37 +670,338 @@
       context.fill();
     }
 
+    function buildWaterfall() {
+      waterfall.pegs = [];
+      waterfall.balls = [];
+      waterfall.completedBalls = 0;
+
+      const startY = 90;
+
+      for (
+        let row = 0;
+        row < PEG_ROWS;
+        row++
+      ) {
+        const pegsInRow =
+          row + 1;
+
+        const rowWidth =
+          (pegsInRow - 1) *
+          PEG_HORIZONTAL_SPACING;
+
+        const startX =
+          WIDTH / 2 -
+          rowWidth / 2;
+
+        for (
+          let column = 0;
+          column < pegsInRow;
+          column++
+        ) {
+          waterfall.pegs.push({
+            x:
+              startX +
+              column *
+              PEG_HORIZONTAL_SPACING,
+            y:
+              startY +
+              row *
+              PEG_VERTICAL_SPACING,
+            row
+          });
+        }
+      }
+
+      waterfall.bins =
+        new Array(PEG_ROWS + 1)
+          .fill(0);
+    }
+
+    function spawnBall() {
+      const value =
+        takeQuantumNumber();
+
+      if (value === null) {
+        stopForEmptyBuffer();
+        return;
+      }
+
+      waterfall.balls.push({
+        x: WIDTH / 2,
+        y: 35,
+        vx: 0,
+        vy: BALL_SPEED,
+        currentRow: 0,
+        quantumValue: value
+      });
+    }
+
+    function updateWaterfallBall(ball) {
+      ball.y += ball.vy;
+
+      const targetRow =
+        ball.currentRow;
+
+      if (targetRow < PEG_ROWS) {
+        const pegY =
+          90 +
+          targetRow *
+          PEG_VERTICAL_SPACING;
+
+        if (ball.y >= pegY) {
+          const quantumValue =
+            takeQuantumNumber();
+
+          if (quantumValue === null) {
+            stopForEmptyBuffer();
+            return false;
+          }
+
+          const goRight =
+            quantumValue % 2 === 1;
+
+          ball.x +=
+            goRight
+              ? PEG_HORIZONTAL_SPACING / 2
+              : -PEG_HORIZONTAL_SPACING / 2;
+
+          ball.currentRow++;
+        }
+      }
+
+      const binTop =
+        90 +
+        PEG_ROWS *
+        PEG_VERTICAL_SPACING +
+        28;
+
+      if (ball.y >= binTop) {
+        const leftEdge =
+          WIDTH / 2 -
+          PEG_ROWS *
+          PEG_HORIZONTAL_SPACING /
+          2;
+
+        const rawIndex =
+          Math.round(
+            (
+              ball.x -
+              leftEdge
+            ) /
+            PEG_HORIZONTAL_SPACING
+          );
+
+        const binIndex =
+          Math.max(
+            0,
+            Math.min(
+              waterfall.bins.length - 1,
+              rawIndex
+            )
+          );
+
+        waterfall.bins[binIndex]++;
+        waterfall.completedBalls++;
+
+        updateInterface();
+
+        return false;
+      }
+
+      return true;
+    }
+
+    function updateWaterfall(
+      elapsed
+    ) {
+      ballSpawnAccumulator += elapsed;
+
+      while (
+        ballSpawnAccumulator >=
+        BALL_SPAWN_INTERVAL &&
+        running
+      ) {
+        spawnBall();
+
+        ballSpawnAccumulator -=
+          BALL_SPAWN_INTERVAL;
+      }
+
+      waterfall.balls =
+        waterfall.balls.filter(
+          updateWaterfallBall
+        );
+    }
+
+    function drawWaterfall() {
+      context.fillStyle = "#010409";
+
+      context.fillRect(
+        0,
+        0,
+        WIDTH,
+        HEIGHT
+      );
+
+      context.fillStyle = "#8b949e";
+
+      for (
+        const peg of waterfall.pegs
+      ) {
+        context.beginPath();
+
+        context.arc(
+          peg.x,
+          peg.y,
+          PEG_RADIUS,
+          0,
+          Math.PI * 2
+        );
+
+        context.fill();
+      }
+
+      context.fillStyle = "#58a6ff";
+
+      for (
+        const ball of waterfall.balls
+      ) {
+        context.beginPath();
+
+        context.arc(
+          ball.x,
+          ball.y,
+          BALL_RADIUS,
+          0,
+          Math.PI * 2
+        );
+
+        context.fill();
+      }
+
+      const binsTop =
+        90 +
+        PEG_ROWS *
+        PEG_VERTICAL_SPACING +
+        28;
+
+      const binWidth =
+        WIDTH /
+        waterfall.bins.length;
+
+      const maximum =
+        Math.max(
+          1,
+          ...waterfall.bins
+        );
+
+      context.font =
+        "13px system-ui";
+
+      context.textAlign =
+        "center";
+
+      for (
+        let index = 0;
+        index <
+        waterfall.bins.length;
+        index++
+      ) {
+        const count =
+          waterfall.bins[index];
+
+        const x =
+          index *
+          binWidth;
+
+        const barHeight =
+          count /
+          maximum *
+          85;
+
+        context.strokeStyle =
+          "#484f58";
+
+        context.strokeRect(
+          x,
+          binsTop,
+          binWidth,
+          HEIGHT - binsTop - 35
+        );
+
+        context.fillStyle =
+          "rgba(88,166,255,0.55)";
+
+        context.fillRect(
+          x + 2,
+          HEIGHT - 36 - barHeight,
+          binWidth - 4,
+          barHeight
+        );
+
+        context.fillStyle =
+          "#f0f6fc";
+
+        context.fillText(
+          String(count),
+          x + binWidth / 2,
+          HEIGHT - 12
+        );
+      }
+    }
+
+    function drawCurrentMode() {
+      if (currentMode === "walk") {
+        drawWalk();
+      }
+
+      if (
+        currentMode === "waterfall"
+      ) {
+        drawWaterfall();
+      }
+    }
+
     function animationLoop(timestamp) {
       if (!running) {
         return;
       }
 
       if (previousFrameTime === 0) {
-        previousFrameTime =
-          timestamp;
+        previousFrameTime = timestamp;
       }
 
       const elapsed =
-        timestamp -
-        previousFrameTime;
+        Math.min(
+          100,
+          timestamp -
+          previousFrameTime
+        );
 
-      previousFrameTime =
-        timestamp;
+      previousFrameTime = timestamp;
 
-      accumulatedTime +=
-        elapsed;
+      if (currentMode === "walk") {
+        accumulatedTime += elapsed;
 
-      while (
-        accumulatedTime >= STEP_INTERVAL &&
-        running
-      ) {
-        performStep();
+        while (
+          accumulatedTime >=
+          WALK_STEP_INTERVAL &&
+          running
+        ) {
+          performWalkStep();
 
-        accumulatedTime -=
-          STEP_INTERVAL;
+          accumulatedTime -=
+            WALK_STEP_INTERVAL;
+        }
       }
 
-      drawArena();
+      if (
+        currentMode === "waterfall"
+      ) {
+        updateWaterfall(elapsed);
+      }
+
+      drawCurrentMode();
 
       if (running) {
         animationFrame =
@@ -569,7 +1011,7 @@
       }
     }
 
-    function resetWalker() {
+    function resetCurrentExperiment() {
       running = false;
       wasRunningBeforeEmpty = false;
 
@@ -577,20 +1019,22 @@
         animationFrame
       );
 
-      walker.x =
-        WIDTH / 2;
-
-      walker.y =
-        HEIGHT / 2;
-
-      walker.trail = [];
-      walker.steps = 0;
-
       previousFrameTime = 0;
       accumulatedTime = 0;
+      ballSpawnAccumulator = 0;
 
       startButton.textContent =
         "Start";
+
+      if (currentMode === "walk") {
+        resetWalk();
+      }
+
+      if (
+        currentMode === "waterfall"
+      ) {
+        buildWaterfall();
+      }
 
       statusElement.textContent =
         quantumBuffer.length > 0
@@ -598,11 +1042,11 @@
           : "Quantumdata laden…";
 
       updateInterface();
-      drawArena();
+      drawCurrentMode();
       checkBuffer();
     }
 
-    async function startWalk() {
+    async function startExperiment() {
       if (running) {
         return;
       }
@@ -631,7 +1075,7 @@
         "Pauzeer";
 
       statusElement.textContent =
-        "Quantum walk actief";
+        "Experiment actief";
 
       previousFrameTime = 0;
 
@@ -640,6 +1084,58 @@
           animationLoop
         );
     }
+
+    function openExperiment(mode) {
+      currentMode = mode;
+
+      choiceScreen.classList.add(
+        "hidden"
+      );
+
+      experimentScreen.classList.remove(
+        "hidden"
+      );
+
+      modeInfo.textContent =
+        mode === "walk"
+          ? "Modus: Random Walk"
+          : "Modus: Knikkerwaterval";
+
+      resetCurrentExperiment();
+    }
+
+    function returnToMenu() {
+      running = false;
+      currentMode = null;
+
+      cancelAnimationFrame(
+        animationFrame
+      );
+
+      experimentScreen.classList.add(
+        "hidden"
+      );
+
+      choiceScreen.classList.remove(
+        "hidden"
+      );
+
+      updateInterface();
+    }
+
+    chooseWalkButton.addEventListener(
+      "click",
+      () => {
+        openExperiment("walk");
+      }
+    );
+
+    chooseWaterfallButton.addEventListener(
+      "click",
+      () => {
+        openExperiment("waterfall");
+      }
+    );
 
     startButton.addEventListener(
       "click",
@@ -661,39 +1157,39 @@
           return;
         }
 
-        await startWalk();
+        await startExperiment();
       }
     );
 
     restartButton.addEventListener(
       "click",
       async () => {
-        resetWalker();
-        await startWalk();
+        resetCurrentExperiment();
+        await startExperiment();
       }
     );
 
-    /*
-      Elke vijf seconden controleren of
-      prefetch nodig is.
-    */
+    menuButton.addEventListener(
+      "click",
+      returnToMenu
+    );
+
     setInterval(
       checkBuffer,
       5_000
     );
 
     async function initialize() {
-      resetWalker();
+      resetWalk();
+      buildWaterfall();
+      updateInterface();
 
       const success =
         await fetchQuantumBatch(true);
 
-      if (
-        success &&
-        quantumBuffer.length > 0
-      ) {
-        statusElement.textContent =
-          "Quantumdata gereed";
+      if (success) {
+        choiceStatus.textContent =
+          `Quantumdata gereed · buffer ${quantumBuffer.length}`;
       }
     }
 
@@ -701,3 +1197,4 @@
   </script>
 </body>
 </html>
+```
