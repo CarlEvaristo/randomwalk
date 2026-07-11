@@ -201,7 +201,7 @@
           >
             <span class="choice-icon">◐</span>
             <strong>Lichtsterkte-walk</strong>
-            <small>Quantum-random lichter/donkerder</small>
+            <small>Verborgen 2D-walk bepaalt grijstint</small>
           </button>
 
         </div>
@@ -211,7 +211,7 @@
         </span>
 
         <small>
-          Versie 1.4.0 · deploy 2026-07-11
+          Versie 1.4.2 · deploy 2026-07-11
         </small>
 
       </div>
@@ -259,7 +259,7 @@
         <span id="counterInfo">Aantal: 0</span>
         <span id="requestInfo">Nog geen batch</span>
         <span id="nextRequestInfo">Volgende request: —</span>
-        <span>Versie 1.4.0</span>
+        <span>Versie 1.4.2</span>
       </div>
 
     </section>
@@ -269,7 +269,7 @@
   <script>
     "use strict";
 
-    const VERSION = "1.4.0";
+    const VERSION = "1.4.2";
 
     const QRNG_URL =
       "https://qrng.anu.edu.au/API/jsonI.php" +
@@ -285,12 +285,8 @@
 
     const WALK_STEP_LENGTH = 10;
 
-    /*
-      Lichtsterkte verandert per quantumstap met
-      0,25 procentpunt omhoog of omlaag.
-    */
-    const BRIGHTNESS_STEP = 0.25;
     const MAX_BRIGHTNESS_HISTORY = 1000;
+    const INITIAL_BRIGHTNESS = 25;
 
     const BALL_SPAWN_INTERVAL = 700;
     const BALL_SPEED = 3.2;
@@ -387,9 +383,11 @@
     };
 
     const brightnessWalk = {
-      brightness: 0,
+      x: WIDTH / 2,
+      y: HEIGHT * 0.75,
+      brightness: INITIAL_BRIGHTNESS,
       steps: 0,
-      history: [0]
+      history: [INITIAL_BRIGHTNESS]
     };
 
     function formatTime(timestamp) {
@@ -397,9 +395,7 @@
         return "—";
       }
 
-      return new Date(
-        timestamp
-      ).toLocaleTimeString();
+      return new Date(timestamp).toLocaleTimeString();
     }
 
     function updateInterface() {
@@ -414,9 +410,7 @@
           `Knikkers: ${waterfall.completedBalls}`;
       } else if (currentMode === "brightness") {
         counterInfo.textContent =
-          `Lichtsterkte: ${
-            brightnessWalk.brightness.toFixed(2)
-          }%`;
+          `Lichtsterkte: ${brightnessWalk.brightness.toFixed(2)}%`;
       } else {
         counterInfo.textContent =
           "Aantal: 0";
@@ -424,16 +418,12 @@
 
       requestInfo.textContent =
         lastSuccessfulRequest > 0
-          ? `Laatste batch: ${
-              formatTime(lastSuccessfulRequest)
-            }`
+          ? `Laatste batch: ${formatTime(lastSuccessfulRequest)}`
           : "Nog geen batch";
 
       nextRequestInfo.textContent =
         nextRequestAllowedAt > Date.now()
-          ? `Volgende request: ${
-              formatTime(nextRequestAllowedAt)
-            }`
+          ? `Volgende request: ${formatTime(nextRequestAllowedAt)}`
           : "Volgende request: beschikbaar";
 
       if (requestBusy) {
@@ -441,9 +431,7 @@
           "Quantumdata ophalen…";
       } else if (quantumBuffer.length > 0) {
         choiceStatus.textContent =
-          `Quantumdata gereed · buffer ${
-            quantumBuffer.length
-          }`;
+          `Quantumdata gereed · buffer ${quantumBuffer.length}`;
       } else if (lastRequestError) {
         choiceStatus.textContent =
           "QRNG-fout · retry gepland";
@@ -485,10 +473,7 @@
       const now = Date.now();
 
       if (now < nextRequestAllowedAt) {
-        scheduleRequestAt(
-          nextRequestAllowedAt
-        );
-
+        scheduleRequestAt(nextRequestAllowedAt);
         return false;
       }
 
@@ -529,9 +514,7 @@
           );
         }
 
-        quantumBuffer.push(
-          ...result.data
-        );
+        quantumBuffer.push(...result.data);
 
         lastSuccessfulRequest =
           Date.now();
@@ -662,7 +645,7 @@
           "Modus: Knikkerwaterval";
       } else {
         modeInfo.textContent =
-          "Modus: Lichtsterkte-walk";
+          "Modus: Lichtsterkte via 2D-walk";
       }
 
       resetCurrentExperiment();
@@ -1061,9 +1044,24 @@
     }
 
     function resetBrightnessWalk() {
-      brightnessWalk.brightness = 0;
+      brightnessWalk.x =
+        WIDTH / 2;
+
+      /*
+        25% lichtsterkte betekent dat de verborgen
+        walker op 75% van de veldhoogte begint.
+      */
+      brightnessWalk.y =
+        HEIGHT * 0.75;
+
+      brightnessWalk.brightness =
+        INITIAL_BRIGHTNESS;
+
       brightnessWalk.steps = 0;
-      brightnessWalk.history = [0];
+
+      brightnessWalk.history = [
+        INITIAL_BRIGHTNESS
+      ];
     }
 
     function performBrightnessStep() {
@@ -1075,24 +1073,54 @@
         return;
       }
 
-      const goLighter =
-        quantumValue % 2 === 1;
+      const angle =
+        quantumValue /
+        65536 *
+        Math.PI *
+        2;
 
-      brightnessWalk.brightness +=
-        goLighter
-          ? BRIGHTNESS_STEP
-          : -BRIGHTNESS_STEP;
+      brightnessWalk.x +=
+        Math.cos(angle) *
+        WALK_STEP_LENGTH;
 
-      /*
-        Afkappen bij volledig zwart en wit.
-      */
+      brightnessWalk.y +=
+        Math.sin(angle) *
+        WALK_STEP_LENGTH;
+
+      if (brightnessWalk.x < 0) {
+        brightnessWalk.x =
+          -brightnessWalk.x;
+      }
+
+      if (brightnessWalk.x > WIDTH) {
+        brightnessWalk.x =
+          WIDTH -
+          (
+            brightnessWalk.x -
+            WIDTH
+          );
+      }
+
+      if (brightnessWalk.y < 0) {
+        brightnessWalk.y =
+          -brightnessWalk.y;
+      }
+
+      if (brightnessWalk.y > HEIGHT) {
+        brightnessWalk.y =
+          HEIGHT -
+          (
+            brightnessWalk.y -
+            HEIGHT
+          );
+      }
+
       brightnessWalk.brightness =
-        Math.max(
-          0,
-          Math.min(
-            100,
-            brightnessWalk.brightness
-          )
+        100 -
+        (
+          brightnessWalk.y /
+          HEIGHT *
+          100
         );
 
       brightnessWalk.steps++;
@@ -1129,7 +1157,9 @@
         HEIGHT
       );
 
-      drawBrightnessGraph(greyValue);
+      drawBrightnessGraph(
+        greyValue
+      );
     }
 
     function drawBrightnessGraph(
@@ -1151,9 +1181,7 @@
           : "#f0f6fc";
 
       const graphGrid =
-        backgroundGrey > 128
-          ? "rgba(255,255,255,0.22)"
-          : "rgba(255,255,255,0.20)";
+        "rgba(180,180,180,0.3)";
 
       context.fillStyle =
         graphBackground;
@@ -1235,9 +1263,7 @@
       );
 
       context.fillText(
-        `${
-          brightnessWalk.brightness.toFixed(2)
-        }%`,
+        `${brightnessWalk.brightness.toFixed(2)}%`,
         graphX + graphWidth - 55,
         graphY + 16
       );
