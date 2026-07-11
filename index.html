@@ -1,0 +1,293 @@
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chaotische Memory Walk</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #0d1117;
+      color: #f0f6fc;
+    }
+
+    .app {
+      width: min(92vw, 760px);
+      display: grid;
+      gap: 14px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 1rem;
+      cursor: pointer;
+      background: #238636;
+      color: white;
+    }
+
+    button:hover {
+      filter: brightness(1.1);
+    }
+
+    .status {
+      opacity: 0.8;
+      font-size: 0.95rem;
+    }
+
+    canvas {
+      width: 100%;
+      aspect-ratio: 1;
+      display: block;
+      background: #010409;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+    }
+
+    .note {
+      margin: 0;
+      opacity: 0.75;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="toolbar">
+      <button id="toggleBtn">Start</button>
+      <button id="restartBtn">Herstart</button>
+      <span class="status" id="status">Gepauzeerd</span>
+    </div>
+
+    <canvas id="arena" width="720" height="720"></canvas>
+
+    <p class="note">
+      De quasi-random input geeft kleine verstoringen. Het opgeslagen pad werkt terug op
+      de huidige richting, waardoor kleine vroege verschillen sterk kunnen doorwerken.
+    </p>
+  </main>
+
+  <script>
+    "use strict";
+
+    const canvas = document.getElementById("arena");
+    const ctx = canvas.getContext("2d");
+    const toggleBtn = document.getElementById("toggleBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const statusEl = document.getElementById("status");
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const walker = {
+      x: W / 2,
+      y: H / 2,
+      angle: Math.random() * Math.PI * 2,
+      speed: 2.2,
+      trail: [],
+      step: 0
+    };
+
+    let running = false;
+    let animationId = null;
+
+    const settings = {
+      memoryLength: 1800,
+      memoryStrength: 4.8,
+      localRadius: 42,
+      noiseStrength: 0.11,
+      inertia: 0.86,
+      sampleStride: 4,
+      fadeAlpha: 0.035
+    };
+
+    function quasiRandom(step) {
+      // Deterministische, quasi-random combinatie van irrationale frequenties.
+      const a = Math.sin(step * Math.sqrt(2) * 12.9898);
+      const b = Math.sin(step * Math.PI * 0.61803398875);
+      const c = Math.sin(step * Math.E * 0.17320508075);
+      return (a + b + c) / 3;
+    }
+
+    function angleDifference(a, b) {
+      let d = a - b;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      return d;
+    }
+
+    function memoryForce() {
+      let fx = 0;
+      let fy = 0;
+      let weightSum = 0;
+
+      const start = Math.max(0, walker.trail.length - settings.memoryLength);
+
+      for (let i = start; i < walker.trail.length; i += settings.sampleStride) {
+        const p = walker.trail[i];
+        const dx = walker.x - p.x;
+        const dy = walker.y - p.y;
+        const d2 = dx * dx + dy * dy;
+
+        if (d2 < 4 || d2 > settings.localRadius * settings.localRadius) continue;
+
+        const d = Math.sqrt(d2);
+        const age = walker.trail.length - i;
+        const ageWeight = Math.exp(-age / 520);
+        const spatialWeight = Math.exp(-d / 19);
+        const oscillation = Math.sin(d * 0.34 - age * 0.085);
+
+        const weight = ageWeight * spatialWeight * oscillation;
+
+        fx += (dx / d) * weight;
+        fy += (dy / d) * weight;
+        weightSum += Math.abs(weight);
+      }
+
+      if (weightSum === 0) return 0;
+
+      const target = Math.atan2(fy, fx);
+      return angleDifference(target, walker.angle) * settings.memoryStrength;
+    }
+
+    function boundaryForce() {
+      const margin = 70;
+      let fx = 0;
+      let fy = 0;
+
+      if (walker.x < margin) fx += (margin - walker.x) / margin;
+      if (walker.x > W - margin) fx -= (walker.x - (W - margin)) / margin;
+      if (walker.y < margin) fy += (margin - walker.y) / margin;
+      if (walker.y > H - margin) fy -= (walker.y - (H - margin)) / margin;
+
+      if (fx === 0 && fy === 0) return 0;
+
+      const target = Math.atan2(fy, fx);
+      return angleDifference(target, walker.angle) * 2.8;
+    }
+
+    function update() {
+      walker.step++;
+
+      const input = quasiRandom(walker.step);
+      const noise = input * settings.noiseStrength;
+      const feedback = memoryForce();
+      const edge = boundaryForce();
+
+      const turn =
+        walker.angle * settings.inertia +
+        (walker.angle + noise + feedback + edge) * (1 - settings.inertia);
+
+      walker.angle = turn;
+
+      const oldX = walker.x;
+      const oldY = walker.y;
+
+      walker.x += Math.cos(walker.angle) * walker.speed;
+      walker.y += Math.sin(walker.angle) * walker.speed;
+
+      // Reflectie aan de rand.
+      if (walker.x < 0 || walker.x > W) {
+        walker.angle = Math.PI - walker.angle;
+        walker.x = Math.max(0, Math.min(W, walker.x));
+      }
+
+      if (walker.y < 0 || walker.y > H) {
+        walker.angle = -walker.angle;
+        walker.y = Math.max(0, Math.min(H, walker.y));
+      }
+
+      walker.trail.push({ x: walker.x, y: walker.y });
+
+      if (walker.trail.length > settings.memoryLength * 2) {
+        walker.trail.splice(0, walker.trail.length - settings.memoryLength * 2);
+      }
+
+      drawSegment(oldX, oldY, walker.x, walker.y);
+    }
+
+    function drawSegment(x1, y1, x2, y2) {
+      ctx.strokeStyle = "rgba(88, 166, 255, 0.75)";
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.fillStyle = "#f2cc60";
+      ctx.beginPath();
+      ctx.arc(x2, y2, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function fadeCanvas() {
+      ctx.fillStyle = `rgba(1, 4, 9, ${settings.fadeAlpha})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    function loop() {
+      if (!running) return;
+
+      fadeCanvas();
+
+      for (let i = 0; i < 3; i++) {
+        update();
+      }
+
+      animationId = requestAnimationFrame(loop);
+    }
+
+    function reset() {
+      running = false;
+      cancelAnimationFrame(animationId);
+
+      walker.x = W / 2;
+      walker.y = H / 2;
+      walker.angle = Math.random() * Math.PI * 2;
+      walker.trail = [];
+      walker.step = 0;
+
+      ctx.fillStyle = "#010409";
+      ctx.fillRect(0, 0, W, H);
+
+      toggleBtn.textContent = "Start";
+      statusEl.textContent = "Gepauzeerd";
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      running = !running;
+      toggleBtn.textContent = running ? "Pauzeer" : "Start";
+      statusEl.textContent = running ? "Actief" : "Gepauzeerd";
+
+      if (running) loop();
+      else cancelAnimationFrame(animationId);
+    });
+
+    restartBtn.addEventListener("click", () => {
+      reset();
+      running = true;
+      toggleBtn.textContent = "Pauzeer";
+      statusEl.textContent = "Actief";
+      loop();
+    });
+
+    reset();
+  </script>
+</body>
+</html>
