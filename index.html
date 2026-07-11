@@ -1,11 +1,19 @@
+<!DOCTYPE html>
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chaotische Quantum Memory Walk</title>
+
   <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
-    * { box-sizing: border-box; }
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -39,9 +47,13 @@
       color: white;
     }
 
-    button.secondary { background: #30363d; }
-    button:hover { filter: brightness(1.12); }
-    button:disabled { cursor: wait; opacity: 0.55; }
+    button.secondary {
+      background: #30363d;
+    }
+
+    button:hover {
+      filter: brightness(1.12);
+    }
 
     .status {
       margin-left: auto;
@@ -66,6 +78,7 @@
     }
   </style>
 </head>
+
 <body>
   <main class="app">
     <div class="toolbar">
@@ -77,18 +90,26 @@
     <canvas id="arena" width="720" height="720"></canvas>
 
     <p class="note">
-      Richtingsruis komt uit de publieke qrandom.io-QRNG. Het oude pad blijft zichtbaar
-      en werkt als geheugen terug op de volgende bewegingen.
+      Richtingsruis komt via de lokale /qrng-proxy uit een publieke
+      hardware-QRNG. Het oude pad blijft zichtbaar en werkt als geheugen
+      terug op de volgende bewegingen.
     </p>
   </main>
 
   <script>
     "use strict";
 
-    const API_URL = "https://qrandom.io/api/random/ints?min=0&max=65535&n=512";
+    const API_SOURCES = [
+      {
+        name: "Lokale QRNG-proxy",
+        url: "/qrng?n=512",
+        extract: data => data.numbers
+      }
+    ];
 
     const canvas = document.getElementById("arena");
     const ctx = canvas.getContext("2d");
+
     const toggleBtn = document.getElementById("toggleBtn");
     const restartBtn = document.getElementById("restartBtn");
     const statusEl = document.getElementById("status");
@@ -122,120 +143,220 @@
     let apiFailed = false;
 
     async function refillQuantumBuffer() {
-      if (fetching || quantumBuffer.length > 700) return;
+      if (fetching || quantumBuffer.length > 700) {
+        return;
+      }
+
       fetching = true;
       apiFailed = false;
+      let lastError = null;
 
-      try {
-        const response = await fetch(API_URL, { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      for (const source of API_SOURCES) {
+        try {
+          statusEl.textContent = `${source.name} laden…`;
 
-        const data = await response.json();
-        if (!Array.isArray(data.numbers) || data.numbers.length === 0) {
-          throw new Error("Geen quantumgetallen ontvangen");
+          const response = await fetch(source.url, {
+            cache: "no-store"
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          const numbers = source.extract(data);
+
+          if (!Array.isArray(numbers) || numbers.length === 0) {
+            throw new Error("Geen quantumgetallen ontvangen");
+          }
+
+          quantumBuffer.push(...numbers.map(Number));
+
+          statusEl.textContent = running
+            ? `Actief · ${source.name} · ${quantumBuffer.length}`
+            : `Gereed · ${source.name} · ${quantumBuffer.length}`;
+
+          fetching = false;
+          return;
+        } catch (error) {
+          lastError = error;
+          console.warn(`${source.name} mislukt:`, error);
         }
-
-        quantumBuffer.push(...data.numbers);
-        statusEl.textContent = running
-          ? `Actief · ${quantumBuffer.length} quantumgetallen`
-          : `Gereed · ${quantumBuffer.length} quantumgetallen`;
-      } catch (error) {
-        apiFailed = true;
-        running = false;
-        cancelAnimationFrame(animationId);
-        toggleBtn.textContent = "Start";
-        statusEl.textContent = "QRNG-verbinding mislukt";
-        console.error(error);
-      } finally {
-        fetching = false;
       }
+
+      apiFailed = true;
+      running = false;
+
+      cancelAnimationFrame(animationId);
+
+      toggleBtn.textContent = "Start";
+      statusEl.textContent = "Lokale QRNG-proxy onbereikbaar";
+
+      console.error(lastError);
+      fetching = false;
     }
 
     function takeQuantumUnit() {
-      if (quantumBuffer.length < 180) refillQuantumBuffer();
-      if (quantumBuffer.length === 0) return null;
+      if (quantumBuffer.length < 180) {
+        refillQuantumBuffer();
+      }
 
-      // Omzetten naar een getal van -1 tot +1.
+      if (quantumBuffer.length === 0) {
+        return null;
+      }
+
       return (quantumBuffer.shift() / 65535) * 2 - 1;
     }
 
     function angleDifference(a, b) {
-      let d = a - b;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      return d;
+      let difference = a - b;
+
+      while (difference > Math.PI) {
+        difference -= Math.PI * 2;
+      }
+
+      while (difference < -Math.PI) {
+        difference += Math.PI * 2;
+      }
+
+      return difference;
     }
 
     function memoryForce() {
-      let fx = 0;
-      let fy = 0;
+      let forceX = 0;
+      let forceY = 0;
       let weightSum = 0;
 
-      const start = Math.max(0, walker.trail.length - settings.activeMemory);
+      const start = Math.max(
+        0,
+        walker.trail.length - settings.activeMemory
+      );
 
-      for (let i = start; i < walker.trail.length; i += settings.sampleStride) {
-        const p = walker.trail[i];
-        const dx = walker.x - p.x;
-        const dy = walker.y - p.y;
-        const d2 = dx * dx + dy * dy;
+      for (
+        let i = start;
+        i < walker.trail.length;
+        i += settings.sampleStride
+      ) {
+        const point = walker.trail[i];
 
-        if (d2 < 4 || d2 > settings.localRadius ** 2) continue;
+        const dx = walker.x - point.x;
+        const dy = walker.y - point.y;
+        const distanceSquared = dx * dx + dy * dy;
 
-        const d = Math.sqrt(d2);
+        if (
+          distanceSquared < 4 ||
+          distanceSquared > settings.localRadius ** 2
+        ) {
+          continue;
+        }
+
+        const distance = Math.sqrt(distanceSquared);
         const age = walker.trail.length - i;
-        const ageWeight = Math.exp(-age / 540);
-        const spatialWeight = Math.exp(-d / 20);
-        const wave = Math.sin(d * 0.36 - age * 0.09);
-        const weight = ageWeight * spatialWeight * wave;
 
-        fx += (dx / d) * weight;
-        fy += (dy / d) * weight;
+        const ageWeight = Math.exp(-age / 540);
+        const spatialWeight = Math.exp(-distance / 20);
+
+        const wave = Math.sin(
+          distance * 0.36 - age * 0.09
+        );
+
+        const weight =
+          ageWeight *
+          spatialWeight *
+          wave;
+
+        forceX += (dx / distance) * weight;
+        forceY += (dy / distance) * weight;
+
         weightSum += Math.abs(weight);
       }
 
-      if (weightSum === 0) return 0;
+      if (weightSum === 0) {
+        return 0;
+      }
 
-      const target = Math.atan2(fy, fx);
-      return angleDifference(target, walker.angle) * settings.memoryStrength;
+      const targetAngle = Math.atan2(forceY, forceX);
+
+      return (
+        angleDifference(targetAngle, walker.angle) *
+        settings.memoryStrength
+      );
     }
 
     function boundaryForce() {
       const margin = 68;
-      let fx = 0;
-      let fy = 0;
 
-      if (walker.x < margin) fx += (margin - walker.x) / margin;
-      if (walker.x > W - margin) fx -= (walker.x - (W - margin)) / margin;
-      if (walker.y < margin) fy += (margin - walker.y) / margin;
-      if (walker.y > H - margin) fy -= (walker.y - (H - margin)) / margin;
+      let forceX = 0;
+      let forceY = 0;
 
-      if (fx === 0 && fy === 0) return 0;
-      return angleDifference(Math.atan2(fy, fx), walker.angle) * 2.8;
+      if (walker.x < margin) {
+        forceX += (margin - walker.x) / margin;
+      }
+
+      if (walker.x > W - margin) {
+        forceX -= (walker.x - (W - margin)) / margin;
+      }
+
+      if (walker.y < margin) {
+        forceY += (margin - walker.y) / margin;
+      }
+
+      if (walker.y > H - margin) {
+        forceY -= (walker.y - (H - margin)) / margin;
+      }
+
+      if (forceX === 0 && forceY === 0) {
+        return 0;
+      }
+
+      const targetAngle = Math.atan2(forceY, forceX);
+
+      return (
+        angleDifference(targetAngle, walker.angle) *
+        2.8
+      );
     }
 
     function update() {
-      const quantum = takeQuantumUnit();
+      const quantumValue = takeQuantumUnit();
 
-      if (quantum === null) {
+      if (quantumValue === null) {
         running = false;
         toggleBtn.textContent = "Start";
-        statusEl.textContent = fetching ? "Nieuwe quantumdata laden…" : "Quantum-buffer leeg";
+
+        statusEl.textContent = fetching
+          ? "Nieuwe quantumdata laden…"
+          : "Quantum-buffer leeg";
+
         return false;
       }
 
       walker.step++;
 
       const feedback = memoryForce();
-      const edge = boundaryForce();
-      const quantumTurn = quantum * settings.quantumTurnStrength;
+      const edgeForce = boundaryForce();
 
-      const desiredAngle = walker.angle + quantumTurn + feedback + edge;
+      const quantumTurn =
+        quantumValue *
+        settings.quantumTurnStrength;
+
+      const desiredAngle =
+        walker.angle +
+        quantumTurn +
+        feedback +
+        edgeForce;
+
       walker.angle =
         walker.angle * settings.inertia +
         desiredAngle * (1 - settings.inertia);
 
-      walker.x += Math.cos(walker.angle) * walker.speed;
-      walker.y += Math.sin(walker.angle) * walker.speed;
+      walker.x +=
+        Math.cos(walker.angle) *
+        walker.speed;
+
+      walker.y +=
+        Math.sin(walker.angle) *
+        walker.speed;
 
       if (walker.x < 0 || walker.x > W) {
         walker.angle = Math.PI - walker.angle;
@@ -247,10 +368,16 @@
         walker.y = Math.max(0, Math.min(H, walker.y));
       }
 
-      walker.trail.push({ x: walker.x, y: walker.y });
+      walker.trail.push({
+        x: walker.x,
+        y: walker.y
+      });
 
       if (walker.trail.length > settings.visibleTrail) {
-        walker.trail.splice(0, walker.trail.length - settings.visibleTrail);
+        walker.trail.splice(
+          0,
+          walker.trail.length - settings.visibleTrail
+        );
       }
 
       return true;
@@ -261,82 +388,138 @@
       ctx.fillRect(0, 0, W, H);
 
       if (walker.trail.length > 1) {
-        // Oud spoor: helder genoeg om de volledige geschiedenis te blijven zien.
         ctx.lineWidth = 1.25;
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
 
         const chunkSize = 250;
-        for (let start = 1; start < walker.trail.length; start += chunkSize) {
-          const end = Math.min(walker.trail.length, start + chunkSize);
-          const relativeAge = end / walker.trail.length;
-          ctx.strokeStyle = `rgba(88, 166, 255, ${0.16 + relativeAge * 0.62})`;
+
+        for (
+          let start = 1;
+          start < walker.trail.length;
+          start += chunkSize
+        ) {
+          const end = Math.min(
+            walker.trail.length,
+            start + chunkSize
+          );
+
+          const relativeAge =
+            end / walker.trail.length;
+
+          ctx.strokeStyle =
+            `rgba(88, 166, 255, ${
+              0.16 + relativeAge * 0.62
+            })`;
 
           ctx.beginPath();
-          ctx.moveTo(walker.trail[start - 1].x, walker.trail[start - 1].y);
+
+          ctx.moveTo(
+            walker.trail[start - 1].x,
+            walker.trail[start - 1].y
+          );
 
           for (let i = start; i < end; i++) {
-            ctx.lineTo(walker.trail[i].x, walker.trail[i].y);
+            ctx.lineTo(
+              walker.trail[i].x,
+              walker.trail[i].y
+            );
           }
+
           ctx.stroke();
         }
       }
 
       ctx.fillStyle = "#f2cc60";
+
       ctx.beginPath();
-      ctx.arc(walker.x, walker.y, 4.2, 0, Math.PI * 2);
+      ctx.arc(
+        walker.x,
+        walker.y,
+        4.2,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
     }
 
     function loop() {
-      if (!running) return;
+      if (!running) {
+        return;
+      }
 
       for (let i = 0; i < 3; i++) {
-        if (!update()) break;
+        if (!update()) {
+          break;
+        }
       }
 
       draw();
 
-      if (running) animationId = requestAnimationFrame(loop);
+      if (running) {
+        animationId = requestAnimationFrame(loop);
+      }
     }
 
     async function reset() {
       running = false;
+
       cancelAnimationFrame(animationId);
 
       walker.x = W / 2;
       walker.y = H / 2;
       walker.angle = 0;
-      walker.trail = [{ x: walker.x, y: walker.y }];
+      walker.trail = [
+        {
+          x: walker.x,
+          y: walker.y
+        }
+      ];
       walker.step = 0;
 
       toggleBtn.textContent = "Start";
       statusEl.textContent = "Quantum-buffer laden…";
+
       draw();
 
       await refillQuantumBuffer();
 
       if (!apiFailed) {
         const initialQuantum = takeQuantumUnit();
-        walker.angle = initialQuantum === null
-          ? 0
-          : (initialQuantum + 1) * Math.PI;
-        statusEl.textContent = `Gereed · ${quantumBuffer.length} quantumgetallen`;
+
+        walker.angle =
+          initialQuantum === null
+            ? 0
+            : (initialQuantum + 1) * Math.PI;
+
+        statusEl.textContent =
+          `Gereed · ${quantumBuffer.length} quantumgetallen`;
       }
     }
 
     toggleBtn.addEventListener("click", async () => {
-      if (quantumBuffer.length === 0) await refillQuantumBuffer();
-      if (quantumBuffer.length === 0) return;
+      if (quantumBuffer.length === 0) {
+        await refillQuantumBuffer();
+      }
+
+      if (quantumBuffer.length === 0) {
+        return;
+      }
 
       running = !running;
-      toggleBtn.textContent = running ? "Pauzeer" : "Start";
+
+      toggleBtn.textContent =
+        running ? "Pauzeer" : "Start";
+
       statusEl.textContent = running
         ? `Actief · ${quantumBuffer.length} quantumgetallen`
         : `Gepauzeerd · ${quantumBuffer.length} quantumgetallen`;
 
-      if (running) loop();
-      else cancelAnimationFrame(animationId);
+      if (running) {
+        loop();
+      } else {
+        cancelAnimationFrame(animationId);
+      }
     });
 
     restartBtn.addEventListener("click", async () => {
@@ -344,8 +527,12 @@
 
       if (quantumBuffer.length > 0) {
         running = true;
+
         toggleBtn.textContent = "Pauzeer";
-        statusEl.textContent = `Actief · ${quantumBuffer.length} quantumgetallen`;
+
+        statusEl.textContent =
+          `Actief · ${quantumBuffer.length} quantumgetallen`;
+
         loop();
       }
     });
