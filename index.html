@@ -52,6 +52,10 @@
       background: #30363d;
     }
 
+    button:hover {
+      filter: brightness(1.12);
+    }
+
     .status {
       margin-left: auto;
       font-size: 0.9rem;
@@ -71,6 +75,7 @@
       display: flex;
       justify-content: space-between;
       gap: 15px;
+      flex-wrap: wrap;
       font-size: 0.85rem;
       opacity: 0.75;
     }
@@ -82,9 +87,18 @@
 
     <div class="toolbar">
       <button id="startButton">Start</button>
-      <button id="restartButton" class="secondary">Herstart</button>
 
-      <span id="status" class="status">
+      <button
+        id="restartButton"
+        class="secondary"
+      >
+        Herstart
+      </button>
+
+      <span
+        id="status"
+        class="status"
+      >
         Quantumdata laden…
       </span>
     </div>
@@ -98,6 +112,9 @@
     <div class="info">
       <span id="bufferInfo">Buffer: 0</span>
       <span id="stepInfo">Stappen: 0</span>
+      <span id="requestInfo">Nog geen request</span>
+      <span id="versionInfo">Versie 1.2.0</span>
+      <span id="deployInfo">Deploy: 2026-07-11</span>
     </div>
 
   </main>
@@ -109,14 +126,21 @@
       "https://qrng.anu.edu.au/API/jsonI.php" +
       "?length=1024&type=uint16";
 
+    /*
+      Niet vaker dan één normaal request per minuut.
+    */
     const MIN_REQUEST_INTERVAL = 60_000;
-    const RETRY_INTERVAL = 30_000;
 
     /*
-      Nieuwe batch aanvragen zodra minder dan
-      300 getallen over zijn.
+      Na een mislukking 90 seconden wachten.
     */
-    const PREFETCH_THRESHOLD = 300;
+    const RETRY_INTERVAL = 90_000;
+
+    /*
+      Nieuwe batch aanvragen wanneer nog 600
+      getallen in de buffer zitten.
+    */
+    const PREFETCH_THRESHOLD = 600;
 
     const STEPS_PER_SECOND = 10;
     const STEP_INTERVAL = 1000 / STEPS_PER_SECOND;
@@ -143,6 +167,9 @@
     const stepInfo =
       document.getElementById("stepInfo");
 
+    const requestInfo =
+      document.getElementById("requestInfo");
+
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
 
@@ -154,6 +181,8 @@
     };
 
     let running = false;
+    let wasRunningBeforeEmpty = false;
+
     let quantumBuffer = [];
 
     let requestBusy = false;
@@ -171,17 +200,37 @@
 
       stepInfo.textContent =
         `Stappen: ${walker.steps}`;
+
+      if (lastSuccessfulRequest > 0) {
+        const time =
+          new Date(lastSuccessfulRequest);
+
+        requestInfo.textContent =
+          `Laatste batch: ${time.toLocaleTimeString()}`;
+      }
     }
 
     function scheduleRetry() {
       clearTimeout(retryTimer);
 
-      retryTimer = setTimeout(() => {
-        fetchQuantumBatch(true);
+      statusElement.textContent =
+        quantumBuffer.length > 0
+          ? "QRNG-fout · buffer nog actief"
+          : "QRNG-fout · nieuwe poging over 90 seconden";
+
+      retryTimer = setTimeout(async () => {
+        const success =
+          await fetchQuantumBatch(true);
+
+        if (!success) {
+          scheduleRetry();
+        }
       }, RETRY_INTERVAL);
     }
 
-    async function fetchQuantumBatch(forceRetry = false) {
+    async function fetchQuantumBatch(
+      forceRetry = false
+    ) {
       const now = Date.now();
 
       if (requestBusy) {
@@ -189,24 +238,27 @@
       }
 
       /*
-        Na een succesvol request maximaal één
-        nieuw request per minuut.
+        Normale prefetch respecteert de minimale
+        tijd sinds het laatste succesvolle request.
       */
       if (
         !forceRetry &&
         lastSuccessfulRequest > 0 &&
-        now - lastSuccessfulRequest < MIN_REQUEST_INTERVAL
+        now - lastSuccessfulRequest <
+        MIN_REQUEST_INTERVAL
       ) {
         return false;
       }
 
       /*
-        Voorkom snelle herhaalde foutrequests.
+        Ook geforceerde retries mogen niet sneller
+        dan RETRY_INTERVAL plaatsvinden.
       */
       if (
         forceRetry &&
         lastRequestAttempt > 0 &&
-        now - lastRequestAttempt < RETRY_INTERVAL
+        now - lastRequestAttempt <
+        RETRY_INTERVAL
       ) {
         return false;
       }
@@ -218,9 +270,13 @@
         "Quantumdata ophalen…";
 
       try {
+        const requestUrl =
+          `${QRNG_URL}&timestamp=${Date.now()}`;
+
         const response = await fetch(
-          QRNG_URL,
+          requestUrl,
           {
+            method: "GET",
             cache: "no-store"
           }
         );
@@ -244,28 +300,41 @@
           );
         }
 
-        quantumBuffer.push(...result.data);
+        quantumBuffer.push(
+          ...result.data
+        );
 
-        lastSuccessfulRequest = Date.now();
+        lastSuccessfulRequest =
+          Date.now();
 
         clearTimeout(retryTimer);
+
+        updateInterface();
 
         statusElement.textContent =
           running
             ? "Quantum walk actief"
             : "Quantumdata gereed";
 
-        updateInterface();
+        /*
+          Automatisch hervatten wanneer de walk
+          door een lege buffer was gestopt.
+        */
+        if (
+          wasRunningBeforeEmpty &&
+          !running
+        ) {
+          wasRunningBeforeEmpty = false;
+          startWalk();
+        }
 
         return true;
 
       } catch (error) {
-        console.error(error);
-
-        statusElement.textContent =
-          quantumBuffer.length > 0
-            ? "QRNG-fout · buffer nog actief"
-            : "QRNG-fout · opnieuw proberen…";
+        console.error(
+          "QRNG-request mislukt:",
+          error
+        );
 
         scheduleRetry();
 
@@ -278,25 +347,27 @@
 
     function checkBuffer() {
       /*
-        Al ruim voor een lege buffer
-        een nieuw request voorbereiden.
+        Ruim voor de buffer leeg is een nieuwe
+        batch aanvragen.
       */
       if (
-        quantumBuffer.length <= PREFETCH_THRESHOLD &&
+        quantumBuffer.length <=
+        PREFETCH_THRESHOLD &&
         !requestBusy
       ) {
-        fetchQuantumBatch();
+        fetchQuantumBatch(false);
       }
 
       /*
-        Is de buffer echt leeg, probeer dan
-        direct opnieuw, onafhankelijk van de walk.
+        Wanneer de buffer leeg is en geen retry
+        gepland staat, plan dan een retry.
       */
       if (
         quantumBuffer.length === 0 &&
-        !requestBusy
+        !requestBusy &&
+        retryTimer === null
       ) {
-        fetchQuantumBatch(true);
+        scheduleRetry();
       }
     }
 
@@ -313,6 +384,10 @@
       updateInterface();
       checkBuffer();
 
+      /*
+        Zet uint16 om naar een hoek
+        tussen 0 en 360 graden.
+      */
       return (
         value / 65536
       ) * Math.PI * 2;
@@ -323,15 +398,20 @@
         getQuantumDirection();
 
       if (angle === null) {
+        wasRunningBeforeEmpty = running;
         running = false;
+
+        cancelAnimationFrame(
+          animationFrame
+        );
 
         startButton.textContent =
           "Start";
 
         statusElement.textContent =
-          "Buffer leeg · quantumdata ophalen…";
+          "Buffer leeg · wachten op quantumdata…";
 
-        fetchQuantumBatch(true);
+        scheduleRetry();
 
         return;
       }
@@ -347,13 +427,17 @@
         Math.sin(angle) *
         STEP_LENGTH;
 
+      /*
+        Reflecterende randen.
+      */
       if (walker.x < 0) {
         walker.x = -walker.x;
       }
 
       if (walker.x > WIDTH) {
         walker.x =
-          WIDTH - (walker.x - WIDTH);
+          WIDTH -
+          (walker.x - WIDTH);
       }
 
       if (walker.y < 0) {
@@ -362,7 +446,8 @@
 
       if (walker.y > HEIGHT) {
         walker.y =
-          HEIGHT - (walker.y - HEIGHT);
+          HEIGHT -
+          (walker.y - HEIGHT);
       }
 
       walker.trail.push({
@@ -378,7 +463,8 @@
     }
 
     function drawArena() {
-      context.fillStyle = "#010409";
+      context.fillStyle =
+        "#010409";
 
       context.fillRect(
         0,
@@ -485,6 +571,7 @@
 
     function resetWalker() {
       running = false;
+      wasRunningBeforeEmpty = false;
 
       cancelAnimationFrame(
         animationFrame
@@ -516,8 +603,21 @@
     }
 
     async function startWalk() {
+      if (running) {
+        return;
+      }
+
       if (quantumBuffer.length === 0) {
-        await fetchQuantumBatch(true);
+        const success =
+          await fetchQuantumBatch(false);
+
+        if (
+          !success &&
+          quantumBuffer.length === 0
+        ) {
+          scheduleRetry();
+          return;
+        }
       }
 
       if (quantumBuffer.length === 0) {
@@ -525,6 +625,7 @@
       }
 
       running = true;
+      wasRunningBeforeEmpty = false;
 
       startButton.textContent =
         "Pauzeer";
@@ -545,6 +646,7 @@
       async () => {
         if (running) {
           running = false;
+          wasRunningBeforeEmpty = false;
 
           cancelAnimationFrame(
             animationFrame
@@ -572,7 +674,8 @@
     );
 
     /*
-      Extra periodieke controle.
+      Elke vijf seconden controleren of
+      prefetch nodig is.
     */
     setInterval(
       checkBuffer,
@@ -581,7 +684,17 @@
 
     async function initialize() {
       resetWalker();
-      await fetchQuantumBatch(true);
+
+      const success =
+        await fetchQuantumBatch(true);
+
+      if (
+        success &&
+        quantumBuffer.length > 0
+      ) {
+        statusElement.textContent =
+          "Quantumdata gereed";
+      }
     }
 
     initialize();
