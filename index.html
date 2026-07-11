@@ -5,6 +5,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <meta
+    http-equiv="Cache-Control"
+    content="no-cache, no-store, must-revalidate"
+  >
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
   <title>Quantum Random Experiments</title>
 
   <style>
@@ -15,6 +22,10 @@
 
     * {
       box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
     }
 
     body {
@@ -32,18 +43,14 @@
       gap: 14px;
     }
 
-    .hidden {
-      display: none !important;
-    }
-
     .choice-screen {
       min-height: 620px;
       display: grid;
       place-items: center;
+      padding: 30px;
       background: #161b22;
       border: 1px solid #30363d;
       border-radius: 16px;
-      padding: 30px;
     }
 
     .choice-panel {
@@ -59,7 +66,7 @@
     }
 
     .choice-panel p {
-      margin: 0;
+      margin: 8px 0 0;
       color: #8b949e;
     }
 
@@ -70,7 +77,7 @@
     }
 
     .choice-button {
-      min-height: 150px;
+      min-height: 160px;
       padding: 20px;
       display: grid;
       place-items: center;
@@ -80,7 +87,7 @@
       border-radius: 14px;
       color: #f0f6fc;
       cursor: pointer;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
     }
 
     .choice-button:hover {
@@ -113,7 +120,7 @@
       background: #30363d;
     }
 
-    button.danger {
+    button.menu {
       background: #8b2c2c;
     }
 
@@ -163,47 +170,75 @@
 
     <section id="choiceScreen" class="choice-screen">
       <div class="choice-panel">
+
         <div>
           <h1>Quantum-experiment</h1>
-          <p>Kies een visualisatie.</p>
+          <p>Kies welke visualisatie je wilt starten.</p>
         </div>
 
         <div class="choice-buttons">
-          <button id="chooseWalkButton" class="choice-button">
+
+          <button
+            id="chooseWalkButton"
+            class="choice-button"
+            type="button"
+          >
             <span class="choice-icon">〰️</span>
             <strong>Random Walk</strong>
             <small>Quantum-random richtingen</small>
           </button>
 
-          <button id="chooseWaterfallButton" class="choice-button">
+          <button
+            id="chooseWaterfallButton"
+            class="choice-button"
+            type="button"
+          >
             <span class="choice-icon">🔵</span>
             <strong>Knikkerwaterval</strong>
-            <small>Quantum links/rechts-keuzes</small>
+            <small>Quantum-random links/rechts</small>
           </button>
+
         </div>
 
         <span id="choiceStatus">
-          Quantumdata wordt geladen…
+          Quantumdata laden…
         </span>
+
+        <small>
+          Versie 1.3.1 · deploy 2026-07-11
+        </small>
+
       </div>
     </section>
 
-    <section id="experimentScreen" class="hidden">
+    <section id="experimentScreen" hidden>
 
       <div class="toolbar">
-        <button id="startButton">Start</button>
 
-        <button id="restartButton" class="secondary">
+        <button id="startButton" type="button">
+          Start
+        </button>
+
+        <button
+          id="restartButton"
+          class="secondary"
+          type="button"
+        >
           Herstart
         </button>
 
-        <button id="menuButton" class="danger">
-          Menu
+        <button
+          id="menuButton"
+          class="menu"
+          type="button"
+        >
+          Terug naar menu
         </button>
 
         <span id="status" class="status">
           Quantumdata laden…
         </span>
+
       </div>
 
       <canvas
@@ -215,10 +250,9 @@
       <div class="info">
         <span id="modeInfo">Modus: —</span>
         <span id="bufferInfo">Buffer: 0</span>
-        <span id="counterInfo">Stappen: 0</span>
+        <span id="counterInfo">Aantal: 0</span>
         <span id="requestInfo">Nog geen batch</span>
-        <span>Versie 1.3.0</span>
-        <span>Deploy: 2026-07-11</span>
+        <span>Versie 1.3.1</span>
       </div>
 
     </section>
@@ -227,6 +261,8 @@
 
   <script>
     "use strict";
+
+    const VERSION = "1.3.1";
 
     const QRNG_URL =
       "https://qrng.anu.edu.au/API/jsonI.php" +
@@ -243,12 +279,12 @@
     const WALK_STEP_LENGTH = 10;
 
     const BALL_SPAWN_INTERVAL = 700;
-    const BALL_SPEED = 3.4;
+    const BALL_SPEED = 3.2;
     const BALL_RADIUS = 5;
 
-    const PEG_ROWS = 12;
+    const PEG_ROWS = 11;
     const PEG_HORIZONTAL_SPACING = 48;
-    const PEG_VERTICAL_SPACING = 42;
+    const PEG_VERTICAL_SPACING = 43;
     const PEG_RADIUS = 4;
 
     const choiceScreen =
@@ -261,7 +297,9 @@
       document.getElementById("chooseWalkButton");
 
     const chooseWaterfallButton =
-      document.getElementById("chooseWaterfallButton");
+      document.getElementById(
+        "chooseWaterfallButton"
+      );
 
     const choiceStatus =
       document.getElementById("choiceStatus");
@@ -329,6 +367,34 @@
       completedBalls: 0
     };
 
+    function showMenu() {
+      running = false;
+      currentMode = null;
+
+      cancelAnimationFrame(animationFrame);
+
+      experimentScreen.hidden = true;
+      choiceScreen.hidden = false;
+
+      startButton.textContent = "Start";
+
+      updateInterface();
+    }
+
+    function showExperiment(mode) {
+      currentMode = mode;
+
+      choiceScreen.hidden = true;
+      experimentScreen.hidden = false;
+
+      modeInfo.textContent =
+        mode === "walk"
+          ? "Modus: Random Walk"
+          : "Modus: Knikkerwaterval";
+
+      resetCurrentExperiment();
+    }
+
     function updateInterface() {
       bufferInfo.textContent =
         `Buffer: ${quantumBuffer.length}`;
@@ -336,27 +402,34 @@
       if (currentMode === "walk") {
         counterInfo.textContent =
           `Stappen: ${walker.steps}`;
-      }
-
-      if (currentMode === "waterfall") {
+      } else if (currentMode === "waterfall") {
         counterInfo.textContent =
           `Knikkers: ${waterfall.completedBalls}`;
+      } else {
+        counterInfo.textContent = "Aantal: 0";
       }
 
       if (lastSuccessfulRequest > 0) {
-        const time =
-          new Date(lastSuccessfulRequest);
-
         requestInfo.textContent =
-          `Laatste batch: ${time.toLocaleTimeString()}`;
+          `Laatste batch: ${
+            new Date(
+              lastSuccessfulRequest
+            ).toLocaleTimeString()
+          }`;
       }
 
-      choiceStatus.textContent =
-        quantumBuffer.length > 0
-          ? `Quantumdata gereed · buffer ${quantumBuffer.length}`
-          : requestBusy
-            ? "Quantumdata ophalen…"
-            : "Wachten op quantumdata…";
+      if (requestBusy) {
+        choiceStatus.textContent =
+          "Quantumdata ophalen…";
+      } else if (quantumBuffer.length > 0) {
+        choiceStatus.textContent =
+          `Quantumdata gereed · buffer ${
+            quantumBuffer.length
+          }`;
+      } else {
+        choiceStatus.textContent =
+          "Wachten op quantumdata…";
+      }
     }
 
     function scheduleRetry() {
@@ -387,7 +460,7 @@
         !forceRetry &&
         lastSuccessfulRequest > 0 &&
         now - lastSuccessfulRequest <
-        MIN_REQUEST_INTERVAL
+          MIN_REQUEST_INTERVAL
       ) {
         return false;
       }
@@ -396,7 +469,7 @@
         forceRetry &&
         lastRequestAttempt > 0 &&
         now - lastRequestAttempt <
-        RETRY_INTERVAL
+          RETRY_INTERVAL
       ) {
         return false;
       }
@@ -410,11 +483,8 @@
       updateInterface();
 
       try {
-        const requestUrl =
-          `${QRNG_URL}&timestamp=${Date.now()}`;
-
         const response = await fetch(
-          requestUrl,
+          `${QRNG_URL}&timestamp=${Date.now()}`,
           {
             cache: "no-store"
           }
@@ -439,12 +509,9 @@
           );
         }
 
-        quantumBuffer.push(
-          ...result.data
-        );
+        quantumBuffer.push(...result.data);
 
-        lastSuccessfulRequest =
-          Date.now();
+        lastSuccessfulRequest = Date.now();
 
         clearTimeout(retryTimer);
         retryTimer = null;
@@ -459,7 +526,7 @@
         if (
           wasRunningBeforeEmpty &&
           !running &&
-          currentMode !== null
+          currentMode
         ) {
           wasRunningBeforeEmpty = false;
           startExperiment();
@@ -475,12 +542,10 @@
 
         statusElement.textContent =
           quantumBuffer.length > 0
-            ? "QRNG-fout · buffer nog actief"
+            ? "QRNG-fout · buffer actief"
             : "QRNG-fout · retry gepland";
 
         scheduleRetry();
-        updateInterface();
-
         return false;
 
       } finally {
@@ -492,7 +557,7 @@
     function checkBuffer() {
       if (
         quantumBuffer.length <=
-        PREFETCH_THRESHOLD &&
+          PREFETCH_THRESHOLD &&
         !requestBusy
       ) {
         fetchQuantumBatch(false);
@@ -514,8 +579,7 @@
         return null;
       }
 
-      const value =
-        quantumBuffer.shift();
+      const value = quantumBuffer.shift();
 
       updateInterface();
       checkBuffer();
@@ -527,12 +591,9 @@
       wasRunningBeforeEmpty = running;
       running = false;
 
-      cancelAnimationFrame(
-        animationFrame
-      );
+      cancelAnimationFrame(animationFrame);
 
-      startButton.textContent =
-        "Start";
+      startButton.textContent = "Start";
 
       statusElement.textContent =
         "Buffer leeg · wachten op quantumdata…";
@@ -557,10 +618,8 @@
       }
 
       const angle =
-        quantumValue /
-        65536 *
-        Math.PI *
-        2;
+        quantumValue / 65536 *
+        Math.PI * 2;
 
       const oldX = walker.x;
       const oldY = walker.y;
@@ -606,7 +665,6 @@
 
     function drawWalk() {
       context.fillStyle = "#010409";
-
       context.fillRect(
         0,
         0,
@@ -634,8 +692,7 @@
 
         const alpha =
           0.2 +
-          relativeAge *
-          0.75;
+          relativeAge * 0.75;
 
         context.strokeStyle =
           `rgba(88,166,255,${alpha})`;
@@ -656,7 +713,6 @@
       }
 
       context.fillStyle = "#f2cc60";
-
       context.beginPath();
 
       context.arc(
@@ -675,15 +731,14 @@
       waterfall.balls = [];
       waterfall.completedBalls = 0;
 
-      const startY = 90;
+      const startY = 85;
 
       for (
         let row = 0;
         row < PEG_ROWS;
         row++
       ) {
-        const pegsInRow =
-          row + 1;
+        const pegsInRow = row + 1;
 
         const rowWidth =
           (pegsInRow - 1) *
@@ -706,8 +761,7 @@
             y:
               startY +
               row *
-              PEG_VERTICAL_SPACING,
-            row
+              PEG_VERTICAL_SPACING
           });
         }
       }
@@ -718,34 +772,22 @@
     }
 
     function spawnBall() {
-      const value =
-        takeQuantumNumber();
-
-      if (value === null) {
-        stopForEmptyBuffer();
-        return;
-      }
-
       waterfall.balls.push({
         x: WIDTH / 2,
-        y: 35,
-        vx: 0,
+        y: 30,
         vy: BALL_SPEED,
-        currentRow: 0,
-        quantumValue: value
+        row: 0,
+        choices: 0
       });
     }
 
-    function updateWaterfallBall(ball) {
+    function updateBall(ball) {
       ball.y += ball.vy;
 
-      const targetRow =
-        ball.currentRow;
-
-      if (targetRow < PEG_ROWS) {
+      if (ball.row < PEG_ROWS) {
         const pegY =
-          90 +
-          targetRow *
+          85 +
+          ball.row *
           PEG_VERTICAL_SPACING;
 
         if (ball.y >= pegY) {
@@ -754,7 +796,7 @@
 
           if (quantumValue === null) {
             stopForEmptyBuffer();
-            return false;
+            return true;
           }
 
           const goRight =
@@ -765,38 +807,27 @@
               ? PEG_HORIZONTAL_SPACING / 2
               : -PEG_HORIZONTAL_SPACING / 2;
 
-          ball.currentRow++;
+          if (goRight) {
+            ball.choices++;
+          }
+
+          ball.row++;
         }
       }
 
-      const binTop =
-        90 +
+      const binsTop =
+        85 +
         PEG_ROWS *
         PEG_VERTICAL_SPACING +
-        28;
+        18;
 
-      if (ball.y >= binTop) {
-        const leftEdge =
-          WIDTH / 2 -
-          PEG_ROWS *
-          PEG_HORIZONTAL_SPACING /
-          2;
-
-        const rawIndex =
-          Math.round(
-            (
-              ball.x -
-              leftEdge
-            ) /
-            PEG_HORIZONTAL_SPACING
-          );
-
+      if (ball.y >= binsTop) {
         const binIndex =
           Math.max(
             0,
             Math.min(
               waterfall.bins.length - 1,
-              rawIndex
+              ball.choices
             )
           );
 
@@ -804,21 +835,18 @@
         waterfall.completedBalls++;
 
         updateInterface();
-
         return false;
       }
 
       return true;
     }
 
-    function updateWaterfall(
-      elapsed
-    ) {
+    function updateWaterfall(elapsed) {
       ballSpawnAccumulator += elapsed;
 
       while (
         ballSpawnAccumulator >=
-        BALL_SPAWN_INTERVAL &&
+          BALL_SPAWN_INTERVAL &&
         running
       ) {
         spawnBall();
@@ -828,14 +856,11 @@
       }
 
       waterfall.balls =
-        waterfall.balls.filter(
-          updateWaterfallBall
-        );
+        waterfall.balls.filter(updateBall);
     }
 
     function drawWaterfall() {
       context.fillStyle = "#010409";
-
       context.fillRect(
         0,
         0,
@@ -845,9 +870,7 @@
 
       context.fillStyle = "#8b949e";
 
-      for (
-        const peg of waterfall.pegs
-      ) {
+      for (const peg of waterfall.pegs) {
         context.beginPath();
 
         context.arc(
@@ -863,9 +886,7 @@
 
       context.fillStyle = "#58a6ff";
 
-      for (
-        const ball of waterfall.balls
-      ) {
+      for (const ball of waterfall.balls) {
         context.beginPath();
 
         context.arc(
@@ -880,10 +901,10 @@
       }
 
       const binsTop =
-        90 +
+        85 +
         PEG_ROWS *
         PEG_VERTICAL_SPACING +
-        28;
+        18;
 
       const binWidth =
         WIDTH /
@@ -903,21 +924,21 @@
 
       for (
         let index = 0;
-        index <
-        waterfall.bins.length;
+        index < waterfall.bins.length;
         index++
       ) {
         const count =
           waterfall.bins[index];
 
         const x =
-          index *
-          binWidth;
+          index * binWidth;
+
+        const maximumBarHeight =
+          HEIGHT - binsTop - 42;
 
         const barHeight =
-          count /
-          maximum *
-          85;
+          count / maximum *
+          maximumBarHeight;
 
         context.strokeStyle =
           "#484f58";
@@ -926,15 +947,15 @@
           x,
           binsTop,
           binWidth,
-          HEIGHT - binsTop - 35
+          HEIGHT - binsTop - 30
         );
 
         context.fillStyle =
-          "rgba(88,166,255,0.55)";
+          "rgba(88,166,255,0.6)";
 
         context.fillRect(
           x + 2,
-          HEIGHT - 36 - barHeight,
+          HEIGHT - 32 - barHeight,
           binWidth - 4,
           barHeight
         );
@@ -945,7 +966,7 @@
         context.fillText(
           String(count),
           x + binWidth / 2,
-          HEIGHT - 12
+          HEIGHT - 10
         );
       }
     }
@@ -953,9 +974,7 @@
     function drawCurrentMode() {
       if (currentMode === "walk") {
         drawWalk();
-      }
-
-      if (
+      } else if (
         currentMode === "waterfall"
       ) {
         drawWaterfall();
@@ -985,7 +1004,7 @@
 
         while (
           accumulatedTime >=
-          WALK_STEP_INTERVAL &&
+            WALK_STEP_INTERVAL &&
           running
         ) {
           performWalkStep();
@@ -993,9 +1012,7 @@
           accumulatedTime -=
             WALK_STEP_INTERVAL;
         }
-      }
-
-      if (
+      } else if (
         currentMode === "waterfall"
       ) {
         updateWaterfall(elapsed);
@@ -1015,22 +1032,17 @@
       running = false;
       wasRunningBeforeEmpty = false;
 
-      cancelAnimationFrame(
-        animationFrame
-      );
+      cancelAnimationFrame(animationFrame);
 
       previousFrameTime = 0;
       accumulatedTime = 0;
       ballSpawnAccumulator = 0;
 
-      startButton.textContent =
-        "Start";
+      startButton.textContent = "Start";
 
       if (currentMode === "walk") {
         resetWalk();
-      }
-
-      if (
+      } else if (
         currentMode === "waterfall"
       ) {
         buildWaterfall();
@@ -1047,7 +1059,7 @@
     }
 
     async function startExperiment() {
-      if (running) {
+      if (running || !currentMode) {
         return;
       }
 
@@ -1062,10 +1074,6 @@
           scheduleRetry();
           return;
         }
-      }
-
-      if (quantumBuffer.length === 0) {
-        return;
       }
 
       running = true;
@@ -1085,56 +1093,14 @@
         );
     }
 
-    function openExperiment(mode) {
-      currentMode = mode;
-
-      choiceScreen.classList.add(
-        "hidden"
-      );
-
-      experimentScreen.classList.remove(
-        "hidden"
-      );
-
-      modeInfo.textContent =
-        mode === "walk"
-          ? "Modus: Random Walk"
-          : "Modus: Knikkerwaterval";
-
-      resetCurrentExperiment();
-    }
-
-    function returnToMenu() {
-      running = false;
-      currentMode = null;
-
-      cancelAnimationFrame(
-        animationFrame
-      );
-
-      experimentScreen.classList.add(
-        "hidden"
-      );
-
-      choiceScreen.classList.remove(
-        "hidden"
-      );
-
-      updateInterface();
-    }
-
     chooseWalkButton.addEventListener(
       "click",
-      () => {
-        openExperiment("walk");
-      }
+      () => showExperiment("walk")
     );
 
     chooseWaterfallButton.addEventListener(
       "click",
-      () => {
-        openExperiment("waterfall");
-      }
+      () => showExperiment("waterfall")
     );
 
     startButton.addEventListener(
@@ -1171,7 +1137,7 @@
 
     menuButton.addEventListener(
       "click",
-      returnToMenu
+      showMenu
     );
 
     setInterval(
@@ -1180,20 +1146,22 @@
     );
 
     async function initialize() {
+      /*
+        Forceer altijd eerst het menu.
+      */
+      showMenu();
+
       resetWalk();
       buildWaterfall();
       updateInterface();
 
-      const success =
-        await fetchQuantumBatch(true);
-
-      if (success) {
-        choiceStatus.textContent =
-          `Quantumdata gereed · buffer ${quantumBuffer.length}`;
-      }
+      await fetchQuantumBatch(true);
     }
 
-    initialize();
+    window.addEventListener(
+      "DOMContentLoaded",
+      initialize
+    );
   </script>
 </body>
 </html>
