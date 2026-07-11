@@ -109,11 +109,17 @@
       "https://qrng.anu.edu.au/API/jsonI.php" +
       "?length=1024&type=uint16";
 
-    const REQUEST_INTERVAL = 4 * 60_000;
+    const MIN_REQUEST_INTERVAL = 60_000;
+    const RETRY_INTERVAL = 10_000;
 
-    const STEPS_PER_SECOND = 6;
+    /*
+      Nieuwe batch aanvragen zodra minder dan
+      300 getallen over zijn.
+    */
+    const PREFETCH_THRESHOLD = 300;
+
+    const STEPS_PER_SECOND = 10;
     const STEP_INTERVAL = 1000 / STEPS_PER_SECOND;
-
     const STEP_LENGTH = 10;
 
     const canvas =
@@ -151,7 +157,9 @@
     let quantumBuffer = [];
 
     let requestBusy = false;
+    let lastRequestAttempt = 0;
     let lastSuccessfulRequest = 0;
+    let retryTimer = null;
 
     let animationFrame = null;
     let previousFrameTime = 0;
@@ -165,21 +173,46 @@
         `Stappen: ${walker.steps}`;
     }
 
-    async function fetchQuantumBatch() {
+    function scheduleRetry() {
+      clearTimeout(retryTimer);
+
+      retryTimer = setTimeout(() => {
+        fetchQuantumBatch(true);
+      }, RETRY_INTERVAL);
+    }
+
+    async function fetchQuantumBatch(forceRetry = false) {
       const now = Date.now();
 
       if (requestBusy) {
         return false;
       }
 
+      /*
+        Na een succesvol request maximaal één
+        nieuw request per minuut.
+      */
       if (
+        !forceRetry &&
         lastSuccessfulRequest > 0 &&
-        now - lastSuccessfulRequest < REQUEST_INTERVAL
+        now - lastSuccessfulRequest < MIN_REQUEST_INTERVAL
+      ) {
+        return false;
+      }
+
+      /*
+        Voorkom snelle herhaalde foutrequests.
+      */
+      if (
+        forceRetry &&
+        lastRequestAttempt > 0 &&
+        now - lastRequestAttempt < RETRY_INTERVAL
       ) {
         return false;
       }
 
       requestBusy = true;
+      lastRequestAttempt = now;
 
       statusElement.textContent =
         "Quantumdata ophalen…";
@@ -203,19 +236,19 @@
 
         if (
           result.success !== true ||
-          !Array.isArray(result.data)
+          !Array.isArray(result.data) ||
+          result.data.length === 0
         ) {
           throw new Error(
             "Ongeldig QRNG-antwoord"
           );
         }
 
-        quantumBuffer.push(
-          ...result.data
-        );
+        quantumBuffer.push(...result.data);
 
-        lastSuccessfulRequest =
-          Date.now();
+        lastSuccessfulRequest = Date.now();
+
+        clearTimeout(retryTimer);
 
         statusElement.textContent =
           running
@@ -230,7 +263,11 @@
         console.error(error);
 
         statusElement.textContent =
-          "QRNG-request mislukt";
+          quantumBuffer.length > 0
+            ? "QRNG-fout · buffer nog actief"
+            : "QRNG-fout · opnieuw proberen…";
+
+        scheduleRetry();
 
         return false;
 
@@ -239,7 +276,33 @@
       }
     }
 
+    function checkBuffer() {
+      /*
+        Al ruim voor een lege buffer
+        een nieuw request voorbereiden.
+      */
+      if (
+        quantumBuffer.length <= PREFETCH_THRESHOLD &&
+        !requestBusy
+      ) {
+        fetchQuantumBatch();
+      }
+
+      /*
+        Is de buffer echt leeg, probeer dan
+        direct opnieuw, onafhankelijk van de walk.
+      */
+      if (
+        quantumBuffer.length === 0 &&
+        !requestBusy
+      ) {
+        fetchQuantumBatch(true);
+      }
+    }
+
     function getQuantumDirection() {
+      checkBuffer();
+
       if (quantumBuffer.length === 0) {
         return null;
       }
@@ -248,6 +311,7 @@
         quantumBuffer.shift();
 
       updateInterface();
+      checkBuffer();
 
       return (
         value / 65536
@@ -265,7 +329,9 @@
           "Start";
 
         statusElement.textContent =
-          "Quantum-buffer leeg";
+          "Buffer leeg · quantumdata ophalen…";
+
+        fetchQuantumBatch(true);
 
         return;
       }
@@ -280,10 +346,6 @@
       walker.y +=
         Math.sin(angle) *
         STEP_LENGTH;
-
-      /*
-        Reflecterende randen.
-      */
 
       if (walker.x < 0) {
         walker.x = -walker.x;
@@ -450,11 +512,12 @@
 
       updateInterface();
       drawArena();
+      checkBuffer();
     }
 
     async function startWalk() {
       if (quantumBuffer.length === 0) {
-        await fetchQuantumBatch();
+        await fetchQuantumBatch(true);
       }
 
       if (quantumBuffer.length === 0) {
@@ -508,14 +571,17 @@
       }
     );
 
+    /*
+      Extra periodieke controle.
+    */
     setInterval(
-      fetchQuantumBatch,
-      REQUEST_INTERVAL
+      checkBuffer,
+      5_000
     );
 
     async function initialize() {
       resetWalker();
-      await fetchQuantumBatch();
+      await fetchQuantumBatch(true);
     }
 
     initialize();
