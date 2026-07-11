@@ -129,7 +129,7 @@
       "https://qrng.anu.edu.au/API/jsonI.php" +
       "?length=1024&type=uint16";
 
-    const REQUEST_INTERVAL = 60_000;
+    const REQUEST_INTERVAL = 4 * 60_000;
 
     /*
       1024 getallen per minuut is ongeveer 17 per seconde.
@@ -138,7 +138,7 @@
       normaal niet vóór het volgende request leeg raakt.
     */
 
-    const STEPS_PER_SECOND = 15;
+    const STEPS_PER_SECOND = 4;
     const STEP_INTERVAL = 1000 / STEPS_PER_SECOND;
 
     const canvas =
