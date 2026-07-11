@@ -5,10 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta
-    http-equiv="Cache-Control"
-    content="no-cache, no-store, must-revalidate"
-  >
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
@@ -173,39 +170,27 @@
 
         <div>
           <h1>Quantum-experiment</h1>
-          <p>Kies welke visualisatie je wilt starten.</p>
+          <p>Kies een visualisatie.</p>
         </div>
 
         <div class="choice-buttons">
-
-          <button
-            id="chooseWalkButton"
-            class="choice-button"
-            type="button"
-          >
+          <button id="chooseWalkButton" class="choice-button" type="button">
             <span class="choice-icon">〰️</span>
             <strong>Random Walk</strong>
             <small>Quantum-random richtingen</small>
           </button>
 
-          <button
-            id="chooseWaterfallButton"
-            class="choice-button"
-            type="button"
-          >
+          <button id="chooseWaterfallButton" class="choice-button" type="button">
             <span class="choice-icon">🔵</span>
             <strong>Knikkerwaterval</strong>
             <small>Quantum-random links/rechts</small>
           </button>
-
         </div>
 
-        <span id="choiceStatus">
-          Quantumdata laden…
-        </span>
+        <span id="choiceStatus">Quantumdata laden…</span>
 
         <small>
-          Versie 1.3.1 · deploy 2026-07-11
+          Versie 1.3.2 · deploy 2026-07-11
         </small>
 
       </div>
@@ -214,45 +199,30 @@
     <section id="experimentScreen" hidden>
 
       <div class="toolbar">
+        <button id="startButton" type="button">Start</button>
 
-        <button id="startButton" type="button">
-          Start
-        </button>
-
-        <button
-          id="restartButton"
-          class="secondary"
-          type="button"
-        >
+        <button id="restartButton" class="secondary" type="button">
           Herstart
         </button>
 
-        <button
-          id="menuButton"
-          class="menu"
-          type="button"
-        >
+        <button id="menuButton" class="menu" type="button">
           Terug naar menu
         </button>
 
         <span id="status" class="status">
           Quantumdata laden…
         </span>
-
       </div>
 
-      <canvas
-        id="arena"
-        width="720"
-        height="720"
-      ></canvas>
+      <canvas id="arena" width="720" height="720"></canvas>
 
       <div class="info">
         <span id="modeInfo">Modus: —</span>
         <span id="bufferInfo">Buffer: 0</span>
         <span id="counterInfo">Aantal: 0</span>
         <span id="requestInfo">Nog geen batch</span>
-        <span>Versie 1.3.1</span>
+        <span id="nextRequestInfo">Volgende request: —</span>
+        <span>Versie 1.3.2</span>
       </div>
 
     </section>
@@ -262,14 +232,25 @@
   <script>
     "use strict";
 
-    const VERSION = "1.3.1";
+    const VERSION = "1.3.2";
 
     const QRNG_URL =
       "https://qrng.anu.edu.au/API/jsonI.php" +
       "?length=1024&type=uint16";
 
-    const MIN_REQUEST_INTERVAL = 60_000;
-    const RETRY_INTERVAL = 90_000;
+    /*
+      Na een succesvol request minimaal 60 seconden wachten.
+    */
+    const SUCCESS_INTERVAL = 60_000;
+
+    /*
+      Na een mislukt request minimaal 90 seconden wachten.
+    */
+    const FAILURE_INTERVAL = 90_000;
+
+    /*
+      Prefetch wanneer nog 600 waarden beschikbaar zijn.
+    */
     const PREFETCH_THRESHOLD = 600;
 
     const WALK_STEPS_PER_SECOND = 10;
@@ -297,9 +278,7 @@
       document.getElementById("chooseWalkButton");
 
     const chooseWaterfallButton =
-      document.getElementById(
-        "chooseWaterfallButton"
-      );
+      document.getElementById("chooseWaterfallButton");
 
     const choiceStatus =
       document.getElementById("choiceStatus");
@@ -328,6 +307,9 @@
     const requestInfo =
       document.getElementById("requestInfo");
 
+    const nextRequestInfo =
+      document.getElementById("nextRequestInfo");
+
     const canvas =
       document.getElementById("arena");
 
@@ -343,10 +325,16 @@
 
     let quantumBuffer = [];
 
+    /*
+      Centrale requeststatus.
+
+      Er kan maximaal één actief request en één timer bestaan.
+    */
     let requestBusy = false;
-    let lastRequestAttempt = 0;
+    let requestTimer = null;
+    let nextRequestAllowedAt = 0;
     let lastSuccessfulRequest = 0;
-    let retryTimer = null;
+    let lastRequestError = null;
 
     let animationFrame = null;
     let previousFrameTime = 0;
@@ -367,32 +355,12 @@
       completedBalls: 0
     };
 
-    function showMenu() {
-      running = false;
-      currentMode = null;
+    function formatTime(timestamp) {
+      if (!timestamp) {
+        return "—";
+      }
 
-      cancelAnimationFrame(animationFrame);
-
-      experimentScreen.hidden = true;
-      choiceScreen.hidden = false;
-
-      startButton.textContent = "Start";
-
-      updateInterface();
-    }
-
-    function showExperiment(mode) {
-      currentMode = mode;
-
-      choiceScreen.hidden = true;
-      experimentScreen.hidden = false;
-
-      modeInfo.textContent =
-        mode === "walk"
-          ? "Modus: Random Walk"
-          : "Modus: Knikkerwaterval";
-
-      resetCurrentExperiment();
+      return new Date(timestamp).toLocaleTimeString();
     }
 
     function updateInterface() {
@@ -406,76 +374,88 @@
         counterInfo.textContent =
           `Knikkers: ${waterfall.completedBalls}`;
       } else {
-        counterInfo.textContent = "Aantal: 0";
+        counterInfo.textContent =
+          "Aantal: 0";
       }
 
-      if (lastSuccessfulRequest > 0) {
-        requestInfo.textContent =
-          `Laatste batch: ${
-            new Date(
-              lastSuccessfulRequest
-            ).toLocaleTimeString()
-          }`;
-      }
+      requestInfo.textContent =
+        lastSuccessfulRequest > 0
+          ? `Laatste batch: ${formatTime(lastSuccessfulRequest)}`
+          : "Nog geen batch";
+
+      nextRequestInfo.textContent =
+        nextRequestAllowedAt > Date.now()
+          ? `Volgende request: ${formatTime(nextRequestAllowedAt)}`
+          : "Volgende request: beschikbaar";
 
       if (requestBusy) {
         choiceStatus.textContent =
           "Quantumdata ophalen…";
       } else if (quantumBuffer.length > 0) {
         choiceStatus.textContent =
-          `Quantumdata gereed · buffer ${
-            quantumBuffer.length
-          }`;
+          `Quantumdata gereed · buffer ${quantumBuffer.length}`;
+      } else if (lastRequestError) {
+        choiceStatus.textContent =
+          "QRNG-fout · retry gepland";
       } else {
         choiceStatus.textContent =
           "Wachten op quantumdata…";
       }
     }
 
-    function scheduleRetry() {
-      clearTimeout(retryTimer);
-
-      retryTimer = setTimeout(async () => {
-        retryTimer = null;
-
-        const success =
-          await fetchQuantumBatch(true);
-
-        if (!success) {
-          scheduleRetry();
-        }
-      }, RETRY_INTERVAL);
+    function clearRequestTimer() {
+      if (requestTimer !== null) {
+        clearTimeout(requestTimer);
+        requestTimer = null;
+      }
     }
 
-    async function fetchQuantumBatch(
-      forceRetry = false
-    ) {
-      const now = Date.now();
+    function scheduleRequestAt(timestamp) {
+      /*
+        Nooit meer dan één retrytimer tegelijk.
+      */
+      clearRequestTimer();
 
+      const delay =
+        Math.max(
+          0,
+          timestamp - Date.now()
+        );
+
+      requestTimer = setTimeout(() => {
+        requestTimer = null;
+        requestQuantumBatch();
+      }, delay);
+
+      updateInterface();
+    }
+
+    async function requestQuantumBatch() {
+      /*
+        Geen tweede request starten wanneer er al één bezig is.
+      */
       if (requestBusy) {
         return false;
       }
 
-      if (
-        !forceRetry &&
-        lastSuccessfulRequest > 0 &&
-        now - lastSuccessfulRequest <
-          MIN_REQUEST_INTERVAL
-      ) {
+      const now = Date.now();
+
+      /*
+        Wanneer de wachttijd nog niet verstreken is,
+        alleen één timer plannen.
+      */
+      if (now < nextRequestAllowedAt) {
+        scheduleRequestAt(
+          nextRequestAllowedAt
+        );
+
         return false;
       }
 
-      if (
-        forceRetry &&
-        lastRequestAttempt > 0 &&
-        now - lastRequestAttempt <
-          RETRY_INTERVAL
-      ) {
-        return false;
-      }
+      clearRequestTimer();
 
       requestBusy = true;
-      lastRequestAttempt = now;
+      lastRequestError = null;
 
       statusElement.textContent =
         "Quantumdata ophalen…";
@@ -511,10 +491,15 @@
 
         quantumBuffer.push(...result.data);
 
-        lastSuccessfulRequest = Date.now();
+        lastSuccessfulRequest =
+          Date.now();
 
-        clearTimeout(retryTimer);
-        retryTimer = null;
+        /*
+          Na succes minstens 60 seconden wachten.
+        */
+        nextRequestAllowedAt =
+          lastSuccessfulRequest +
+          SUCCESS_INTERVAL;
 
         statusElement.textContent =
           running
@@ -526,7 +511,7 @@
         if (
           wasRunningBeforeEmpty &&
           !running &&
-          currentMode
+          currentMode !== null
         ) {
           wasRunningBeforeEmpty = false;
           startExperiment();
@@ -540,12 +525,25 @@
           error
         );
 
+        lastRequestError = error;
+
+        /*
+          Na elke fout exact één nieuwe poging
+          na FAILURE_INTERVAL.
+        */
+        nextRequestAllowedAt =
+          Date.now() +
+          FAILURE_INTERVAL;
+
         statusElement.textContent =
           quantumBuffer.length > 0
-            ? "QRNG-fout · buffer actief"
+            ? "QRNG-fout · bestaande buffer actief"
             : "QRNG-fout · retry gepland";
 
-        scheduleRetry();
+        scheduleRequestAt(
+          nextRequestAllowedAt
+        );
+
         return false;
 
       } finally {
@@ -554,35 +552,35 @@
       }
     }
 
-    function checkBuffer() {
+    function ensureQuantumSupply() {
       if (
-        quantumBuffer.length <=
-          PREFETCH_THRESHOLD &&
-        !requestBusy
+        quantumBuffer.length >
+        PREFETCH_THRESHOLD
       ) {
-        fetchQuantumBatch(false);
+        return;
       }
 
-      if (
-        quantumBuffer.length === 0 &&
-        !requestBusy &&
-        retryTimer === null
-      ) {
-        scheduleRetry();
-      }
+      /*
+        requestQuantumBatch controleert zelf:
+        - of er al een request bezig is;
+        - of er al een timer bestaat;
+        - of de wachttijd verstreken is.
+      */
+      requestQuantumBatch();
     }
 
     function takeQuantumNumber() {
-      checkBuffer();
+      ensureQuantumSupply();
 
       if (quantumBuffer.length === 0) {
         return null;
       }
 
-      const value = quantumBuffer.shift();
+      const value =
+        quantumBuffer.shift();
 
       updateInterface();
-      checkBuffer();
+      ensureQuantumSupply();
 
       return value;
     }
@@ -591,14 +589,48 @@
       wasRunningBeforeEmpty = running;
       running = false;
 
-      cancelAnimationFrame(animationFrame);
+      cancelAnimationFrame(
+        animationFrame
+      );
 
-      startButton.textContent = "Start";
+      startButton.textContent =
+        "Start";
 
       statusElement.textContent =
         "Buffer leeg · wachten op quantumdata…";
 
-      scheduleRetry();
+      ensureQuantumSupply();
+    }
+
+    function showMenu() {
+      running = false;
+      currentMode = null;
+
+      cancelAnimationFrame(
+        animationFrame
+      );
+
+      experimentScreen.hidden = true;
+      choiceScreen.hidden = false;
+
+      startButton.textContent =
+        "Start";
+
+      updateInterface();
+    }
+
+    function showExperiment(mode) {
+      currentMode = mode;
+
+      choiceScreen.hidden = true;
+      experimentScreen.hidden = false;
+
+      modeInfo.textContent =
+        mode === "walk"
+          ? "Modus: Random Walk"
+          : "Modus: Knikkerwaterval";
+
+      resetCurrentExperiment();
     }
 
     function resetWalk() {
@@ -618,8 +650,10 @@
       }
 
       const angle =
-        quantumValue / 65536 *
-        Math.PI * 2;
+        quantumValue /
+        65536 *
+        Math.PI *
+        2;
 
       const oldX = walker.x;
       const oldY = walker.y;
@@ -665,6 +699,7 @@
 
     function drawWalk() {
       context.fillStyle = "#010409";
+
       context.fillRect(
         0,
         0,
@@ -692,7 +727,8 @@
 
         const alpha =
           0.2 +
-          relativeAge * 0.75;
+          relativeAge *
+          0.75;
 
         context.strokeStyle =
           `rgba(88,166,255,${alpha})`;
@@ -712,7 +748,9 @@
         context.stroke();
       }
 
-      context.fillStyle = "#f2cc60";
+      context.fillStyle =
+        "#f2cc60";
+
       context.beginPath();
 
       context.arc(
@@ -738,7 +776,8 @@
         row < PEG_ROWS;
         row++
       ) {
-        const pegsInRow = row + 1;
+        const pegsInRow =
+          row + 1;
 
         const rowWidth =
           (pegsInRow - 1) *
@@ -846,7 +885,7 @@
 
       while (
         ballSpawnAccumulator >=
-          BALL_SPAWN_INTERVAL &&
+        BALL_SPAWN_INTERVAL &&
         running
       ) {
         spawnBall();
@@ -856,11 +895,15 @@
       }
 
       waterfall.balls =
-        waterfall.balls.filter(updateBall);
+        waterfall.balls.filter(
+          updateBall
+        );
     }
 
     function drawWaterfall() {
-      context.fillStyle = "#010409";
+      context.fillStyle =
+        "#010409";
+
       context.fillRect(
         0,
         0,
@@ -868,9 +911,12 @@
         HEIGHT
       );
 
-      context.fillStyle = "#8b949e";
+      context.fillStyle =
+        "#8b949e";
 
-      for (const peg of waterfall.pegs) {
+      for (
+        const peg of waterfall.pegs
+      ) {
         context.beginPath();
 
         context.arc(
@@ -884,9 +930,12 @@
         context.fill();
       }
 
-      context.fillStyle = "#58a6ff";
+      context.fillStyle =
+        "#58a6ff";
 
-      for (const ball of waterfall.balls) {
+      for (
+        const ball of waterfall.balls
+      ) {
         context.beginPath();
 
         context.arc(
@@ -931,13 +980,17 @@
           waterfall.bins[index];
 
         const x =
-          index * binWidth;
+          index *
+          binWidth;
 
         const maximumBarHeight =
-          HEIGHT - binsTop - 42;
+          HEIGHT -
+          binsTop -
+          42;
 
         const barHeight =
-          count / maximum *
+          count /
+          maximum *
           maximumBarHeight;
 
         context.strokeStyle =
@@ -987,7 +1040,8 @@
       }
 
       if (previousFrameTime === 0) {
-        previousFrameTime = timestamp;
+        previousFrameTime =
+          timestamp;
       }
 
       const elapsed =
@@ -997,14 +1051,15 @@
           previousFrameTime
         );
 
-      previousFrameTime = timestamp;
+      previousFrameTime =
+        timestamp;
 
       if (currentMode === "walk") {
         accumulatedTime += elapsed;
 
         while (
           accumulatedTime >=
-            WALK_STEP_INTERVAL &&
+          WALK_STEP_INTERVAL &&
           running
         ) {
           performWalkStep();
@@ -1032,13 +1087,16 @@
       running = false;
       wasRunningBeforeEmpty = false;
 
-      cancelAnimationFrame(animationFrame);
+      cancelAnimationFrame(
+        animationFrame
+      );
 
       previousFrameTime = 0;
       accumulatedTime = 0;
       ballSpawnAccumulator = 0;
 
-      startButton.textContent = "Start";
+      startButton.textContent =
+        "Start";
 
       if (currentMode === "walk") {
         resetWalk();
@@ -1055,25 +1113,25 @@
 
       updateInterface();
       drawCurrentMode();
-      checkBuffer();
+      ensureQuantumSupply();
     }
 
     async function startExperiment() {
-      if (running || !currentMode) {
+      if (
+        running ||
+        currentMode === null
+      ) {
         return;
       }
 
       if (quantumBuffer.length === 0) {
-        const success =
-          await fetchQuantumBatch(false);
+        await requestQuantumBatch();
+      }
 
-        if (
-          !success &&
-          quantumBuffer.length === 0
-        ) {
-          scheduleRetry();
-          return;
-        }
+      if (quantumBuffer.length === 0) {
+        wasRunningBeforeEmpty = true;
+        ensureQuantumSupply();
+        return;
       }
 
       running = true;
@@ -1095,12 +1153,16 @@
 
     chooseWalkButton.addEventListener(
       "click",
-      () => showExperiment("walk")
+      () => {
+        showExperiment("walk");
+      }
     );
 
     chooseWaterfallButton.addEventListener(
       "click",
-      () => showExperiment("waterfall")
+      () => {
+        showExperiment("waterfall");
+      }
     );
 
     startButton.addEventListener(
@@ -1140,22 +1202,31 @@
       showMenu
     );
 
+    /*
+      Alleen buffer controleren.
+      Dit veroorzaakt nooit extra requests binnen de wachttijd.
+    */
     setInterval(
-      checkBuffer,
+      ensureQuantumSupply,
       5_000
     );
 
+    /*
+      Aftellabel bijwerken zonder requests te versturen.
+    */
+    setInterval(
+      updateInterface,
+      1_000
+    );
+
     async function initialize() {
-      /*
-        Forceer altijd eerst het menu.
-      */
       showMenu();
 
       resetWalk();
       buildWaterfall();
       updateInterface();
 
-      await fetchQuantumBatch(true);
+      await requestQuantumBatch();
     }
 
     window.addEventListener(
