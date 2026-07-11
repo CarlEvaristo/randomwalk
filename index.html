@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>Quantum Memory Walk</title>
+  <title>Quantum Random Walk</title>
 
   <style>
     :root {
@@ -52,10 +52,6 @@
       background: #30363d;
     }
 
-    button:hover {
-      filter: brightness(1.15);
-    }
-
     .status {
       margin-left: auto;
       font-size: 0.9rem;
@@ -86,18 +82,9 @@
 
     <div class="toolbar">
       <button id="startButton">Start</button>
+      <button id="restartButton" class="secondary">Herstart</button>
 
-      <button
-        id="restartButton"
-        class="secondary"
-      >
-        Herstart
-      </button>
-
-      <span
-        id="status"
-        class="status"
-      >
+      <span id="status" class="status">
         Quantumdata laden…
       </span>
     </div>
@@ -110,7 +97,7 @@
 
     <div class="info">
       <span id="bufferInfo">Buffer: 0</span>
-      <span id="requestInfo">Nog geen request</span>
+      <span id="stepInfo">Stappen: 0</span>
     </div>
 
   </main>
@@ -118,28 +105,16 @@
   <script>
     "use strict";
 
-    /*
-      Eén request per minuut.
-
-      De API levert maximaal één grote batch van uint16-getallen.
-      Elk getal bepaalt een kleine richtingsverandering.
-    */
-
     const QRNG_URL =
       "https://qrng.anu.edu.au/API/jsonI.php" +
       "?length=1024&type=uint16";
 
-    const REQUEST_INTERVAL = 4 * 60_000;
+    const REQUEST_INTERVAL = 60_000;
 
-    /*
-      1024 getallen per minuut is ongeveer 17 per seconde.
-
-      We gebruiken 15 stappen per seconde, zodat de buffer
-      normaal niet vóór het volgende request leeg raakt.
-    */
-
-    const STEPS_PER_SECOND = 4;
+    const STEPS_PER_SECOND = 10;
     const STEP_INTERVAL = 1000 / STEPS_PER_SECOND;
+
+    const STEP_LENGTH = 10;
 
     const canvas =
       document.getElementById("arena");
@@ -159,35 +134,16 @@
     const bufferInfo =
       document.getElementById("bufferInfo");
 
-    const requestInfo =
-      document.getElementById("requestInfo");
+    const stepInfo =
+      document.getElementById("stepInfo");
 
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
 
-    const settings = {
-      speed: 3,
-      quantumTurnStrength: 0.55,
-
-      activeMemory: 1600,
-      visibleTrail: 6500,
-
-      memoryRadius: 55,
-      memoryStrength: 3.8,
-      sampleStride: 5,
-
-      boundaryMargin: 60,
-      boundaryStrength: 2.4
-    };
-
     const walker = {
       x: WIDTH / 2,
       y: HEIGHT / 2,
-
-      angle: 0,
-
       trail: [],
-
       steps: 0
     };
 
@@ -195,7 +151,7 @@
     let quantumBuffer = [];
 
     let requestBusy = false;
-    let lastRequestTime = 0;
+    let lastSuccessfulRequest = 0;
 
     let animationFrame = null;
     let previousFrameTime = 0;
@@ -205,46 +161,33 @@
       bufferInfo.textContent =
         `Buffer: ${quantumBuffer.length}`;
 
-      if (lastRequestTime > 0) {
-        const time =
-          new Date(lastRequestTime);
-
-        requestInfo.textContent =
-          `Laatste request: ${time.toLocaleTimeString()}`;
-      }
+      stepInfo.textContent =
+        `Stappen: ${walker.steps}`;
     }
 
     async function fetchQuantumBatch() {
       const now = Date.now();
-
-      /*
-        Voorkom meer dan één request per minuut.
-      */
 
       if (requestBusy) {
         return false;
       }
 
       if (
-        lastRequestTime > 0 &&
-        now - lastRequestTime < REQUEST_INTERVAL
+        lastSuccessfulRequest > 0 &&
+        now - lastSuccessfulRequest < REQUEST_INTERVAL
       ) {
         return false;
       }
 
       requestBusy = true;
-      lastRequestTime = now;
 
       statusElement.textContent =
         "Quantumdata ophalen…";
-
-      updateInterface();
 
       try {
         const response = await fetch(
           QRNG_URL,
           {
-            method: "GET",
             cache: "no-store"
           }
         );
@@ -263,13 +206,16 @@
           !Array.isArray(result.data)
         ) {
           throw new Error(
-            "Ongeldig antwoord van QRNG"
+            "Ongeldig QRNG-antwoord"
           );
         }
 
         quantumBuffer.push(
           ...result.data
         );
+
+        lastSuccessfulRequest =
+          Date.now();
 
         statusElement.textContent =
           running
@@ -284,7 +230,7 @@
         console.error(error);
 
         statusElement.textContent =
-          "QRNG-request geblokkeerd of onbereikbaar";
+          "QRNG-request mislukt";
 
         return false;
 
@@ -293,7 +239,7 @@
       }
     }
 
-    function getQuantumValue() {
+    function getQuantumDirection() {
       if (quantumBuffer.length === 0) {
         return null;
       }
@@ -303,194 +249,16 @@
 
       updateInterface();
 
-      /*
-        Zet uint16 om naar een bereik van -1 tot +1.
-      */
-
       return (
-        value / 65535
-      ) * 2 - 1;
-    }
-
-    function normalizeAngleDifference(
-      target,
-      current
-    ) {
-      let difference =
-        target - current;
-
-      while (difference > Math.PI) {
-        difference -= Math.PI * 2;
-      }
-
-      while (difference < -Math.PI) {
-        difference += Math.PI * 2;
-      }
-
-      return difference;
-    }
-
-    function calculateMemoryForce() {
-      let forceX = 0;
-      let forceY = 0;
-      let totalWeight = 0;
-
-      const startIndex =
-        Math.max(
-          0,
-          walker.trail.length -
-          settings.activeMemory
-        );
-
-      for (
-        let index = startIndex;
-        index < walker.trail.length;
-        index += settings.sampleStride
-      ) {
-        const point =
-          walker.trail[index];
-
-        const deltaX =
-          walker.x - point.x;
-
-        const deltaY =
-          walker.y - point.y;
-
-        const distanceSquared =
-          deltaX * deltaX +
-          deltaY * deltaY;
-
-        if (distanceSquared < 9) {
-          continue;
-        }
-
-        if (
-          distanceSquared >
-          settings.memoryRadius *
-          settings.memoryRadius
-        ) {
-          continue;
-        }
-
-        const distance =
-          Math.sqrt(distanceSquared);
-
-        const age =
-          walker.trail.length - index;
-
-        const ageWeight =
-          Math.exp(-age / 500);
-
-        const distanceWeight =
-          Math.exp(-distance / 22);
-
-        /*
-          Golfachtige aantrekking en afstoting
-          tot het historische pad.
-        */
-
-        const wave =
-          Math.sin(
-            distance * 0.32 -
-            age * 0.075
-          );
-
-        const weight =
-          ageWeight *
-          distanceWeight *
-          wave;
-
-        forceX +=
-          deltaX / distance * weight;
-
-        forceY +=
-          deltaY / distance * weight;
-
-        totalWeight +=
-          Math.abs(weight);
-      }
-
-      if (totalWeight === 0) {
-        return 0;
-      }
-
-      const targetAngle =
-        Math.atan2(
-          forceY,
-          forceX
-        );
-
-      return (
-        normalizeAngleDifference(
-          targetAngle,
-          walker.angle
-        ) *
-        settings.memoryStrength
-      );
-    }
-
-    function calculateBoundaryForce() {
-      let forceX = 0;
-      let forceY = 0;
-
-      const margin =
-        settings.boundaryMargin;
-
-      if (walker.x < margin) {
-        forceX +=
-          (margin - walker.x) /
-          margin;
-      }
-
-      if (walker.x > WIDTH - margin) {
-        forceX -=
-          (
-            walker.x -
-            (WIDTH - margin)
-          ) / margin;
-      }
-
-      if (walker.y < margin) {
-        forceY +=
-          (margin - walker.y) /
-          margin;
-      }
-
-      if (walker.y > HEIGHT - margin) {
-        forceY -=
-          (
-            walker.y -
-            (HEIGHT - margin)
-          ) / margin;
-      }
-
-      if (
-        forceX === 0 &&
-        forceY === 0
-      ) {
-        return 0;
-      }
-
-      const targetAngle =
-        Math.atan2(
-          forceY,
-          forceX
-        );
-
-      return (
-        normalizeAngleDifference(
-          targetAngle,
-          walker.angle
-        ) *
-        settings.boundaryStrength
-      );
+        value / 65536
+      ) * Math.PI * 2;
     }
 
     function performStep() {
-      const quantumValue =
-        getQuantumValue();
+      const angle =
+        getQuantumDirection();
 
-      if (quantumValue === null) {
+      if (angle === null) {
         running = false;
 
         startButton.textContent =
@@ -502,83 +270,53 @@
         return;
       }
 
-      const quantumTurn =
-        quantumValue *
-        settings.quantumTurnStrength;
-
-      const memoryTurn =
-        calculateMemoryForce();
-
-      const boundaryTurn =
-        calculateBoundaryForce();
-
-      walker.angle +=
-        quantumTurn +
-        memoryTurn * 0.08 +
-        boundaryTurn * 0.12;
+      const oldX = walker.x;
+      const oldY = walker.y;
 
       walker.x +=
-        Math.cos(walker.angle) *
-        settings.speed;
+        Math.cos(angle) *
+        STEP_LENGTH;
 
       walker.y +=
-        Math.sin(walker.angle) *
-        settings.speed;
+        Math.sin(angle) *
+        STEP_LENGTH;
 
       /*
-        Reflectie wanneer het pad toch de rand raakt.
+        Reflecterende randen.
       */
 
-      if (
-        walker.x <= 0 ||
-        walker.x >= WIDTH
-      ) {
-        walker.angle =
-          Math.PI - walker.angle;
-
-        walker.x =
-          Math.max(
-            0,
-            Math.min(WIDTH, walker.x)
-          );
+      if (walker.x < 0) {
+        walker.x = -walker.x;
       }
 
-      if (
-        walker.y <= 0 ||
-        walker.y >= HEIGHT
-      ) {
-        walker.angle =
-          -walker.angle;
+      if (walker.x > WIDTH) {
+        walker.x =
+          WIDTH - (walker.x - WIDTH);
+      }
 
+      if (walker.y < 0) {
+        walker.y = -walker.y;
+      }
+
+      if (walker.y > HEIGHT) {
         walker.y =
-          Math.max(
-            0,
-            Math.min(HEIGHT, walker.y)
-          );
+          HEIGHT - (walker.y - HEIGHT);
       }
 
       walker.trail.push({
-        x: walker.x,
-        y: walker.y
+        x1: oldX,
+        y1: oldY,
+        x2: walker.x,
+        y2: walker.y
       });
 
       walker.steps++;
 
-      if (
-        walker.trail.length >
-        settings.visibleTrail
-      ) {
-        walker.trail.splice(
-          0,
-          walker.trail.length -
-          settings.visibleTrail
-        );
-      }
+      updateInterface();
     }
 
     function drawArena() {
-      context.fillStyle =
-        "#010409";
+      context.fillStyle = "#010409";
 
       context.fillRect(
         0,
@@ -587,67 +325,45 @@
         HEIGHT
       );
 
-      /*
-        Historisch pad.
+      context.lineWidth = 1.5;
+      context.lineCap = "round";
 
-        Oudere delen blijven zichtbaar,
-        nieuwere delen worden helderder.
-      */
+      for (
+        let index = 0;
+        index < walker.trail.length;
+        index++
+      ) {
+        const segment =
+          walker.trail[index];
 
-      if (walker.trail.length > 1) {
-        context.lineWidth = 1.6;
-        context.lineCap = "round";
-        context.lineJoin = "round";
-
-        const segmentSize = 200;
-
-        for (
-          let start = 1;
-          start < walker.trail.length;
-          start += segmentSize
-        ) {
-          const end =
-            Math.min(
-              walker.trail.length,
-              start + segmentSize
-            );
-
-          const relativeAge =
-            end /
-            walker.trail.length;
-
-          const alpha =
-            0.28 +
-            relativeAge * 0.7;
-
-          context.strokeStyle =
-            `rgba(88,166,255,${alpha})`;
-
-          context.beginPath();
-
-          context.moveTo(
-            walker.trail[start - 1].x,
-            walker.trail[start - 1].y
+        const relativeAge =
+          index /
+          Math.max(
+            1,
+            walker.trail.length
           );
 
-          for (
-            let index = start;
-            index < end;
-            index++
-          ) {
-            context.lineTo(
-              walker.trail[index].x,
-              walker.trail[index].y
-            );
-          }
+        const alpha =
+          0.2 +
+          relativeAge * 0.75;
 
-          context.stroke();
-        }
+        context.strokeStyle =
+          `rgba(88,166,255,${alpha})`;
+
+        context.beginPath();
+
+        context.moveTo(
+          segment.x1,
+          segment.y1
+        );
+
+        context.lineTo(
+          segment.x2,
+          segment.y2
+        );
+
+        context.stroke();
       }
-
-      /*
-        Huidige walker.
-      */
 
       context.fillStyle =
         "#f2cc60";
@@ -671,14 +387,19 @@
       }
 
       if (previousFrameTime === 0) {
-        previousFrameTime = timestamp;
+        previousFrameTime =
+          timestamp;
       }
 
       const elapsed =
-        timestamp - previousFrameTime;
+        timestamp -
+        previousFrameTime;
 
-      previousFrameTime = timestamp;
-      accumulatedTime += elapsed;
+      previousFrameTime =
+        timestamp;
+
+      accumulatedTime +=
+        elapsed;
 
       while (
         accumulatedTime >= STEP_INTERVAL &&
@@ -692,10 +413,12 @@
 
       drawArena();
 
-      animationFrame =
-        requestAnimationFrame(
-          animationLoop
-        );
+      if (running) {
+        animationFrame =
+          requestAnimationFrame(
+            animationLoop
+          );
+      }
     }
 
     function resetWalker() {
@@ -711,21 +434,7 @@
       walker.y =
         HEIGHT / 2;
 
-      walker.angle =
-        quantumBuffer.length > 0
-          ? (
-              quantumBuffer[0] /
-              65535
-            ) * Math.PI * 2
-          : 0;
-
-      walker.trail = [
-        {
-          x: walker.x,
-          y: walker.y
-        }
-      ];
-
+      walker.trail = [];
       walker.steps = 0;
 
       previousFrameTime = 0;
@@ -736,9 +445,10 @@
 
       statusElement.textContent =
         quantumBuffer.length > 0
-          ? "Gereed"
+          ? "Quantumdata gereed"
           : "Quantumdata laden…";
 
+      updateInterface();
       drawArena();
     }
 
@@ -794,39 +504,18 @@
       "click",
       async () => {
         resetWalker();
-
-        if (quantumBuffer.length === 0) {
-          await fetchQuantumBatch();
-        }
-
         await startWalk();
       }
     );
 
-    /*
-      Automatisch maximaal één request per minuut.
-    */
-
     setInterval(
-      () => {
-        fetchQuantumBatch();
-      },
+      fetchQuantumBatch,
       REQUEST_INTERVAL
     );
 
-    /*
-      Eerste batch ophalen.
-    */
-
     async function initialize() {
       resetWalker();
-
       await fetchQuantumBatch();
-
-      if (quantumBuffer.length > 0) {
-        statusElement.textContent =
-          "Quantumdata gereed";
-      }
     }
 
     initialize();
