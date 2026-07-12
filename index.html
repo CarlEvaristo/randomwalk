@@ -37,6 +37,7 @@
       width: min(94vw, 820px);
       display: grid;
       gap: 14px;
+      padding: 18px 0;
     }
 
     .choice-screen {
@@ -139,6 +140,45 @@
       border-radius: 12px;
     }
 
+    .stats-panel {
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+    }
+
+    .stats-panel h2 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 10px;
+      background: #21262d;
+      border-radius: 9px;
+      text-align: center;
+    }
+
+    .stat-label {
+      display: block;
+      margin-bottom: 4px;
+      color: #8b949e;
+      font-size: 0.76rem;
+    }
+
+    .stat-value {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
     .info {
       display: flex;
       justify-content: space-between;
@@ -151,6 +191,10 @@
     @media (max-width: 760px) {
       .choice-buttons {
         grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .status {
@@ -211,7 +255,7 @@
         </span>
 
         <small>
-          Versie 1.4.2 · deploy 2026-07-11
+          Versie 1.5.0
         </small>
 
       </div>
@@ -253,13 +297,18 @@
         height="720"
       ></canvas>
 
+      <section class="stats-panel">
+        <h2 id="statsTitle">Statistieken huidige run</h2>
+        <div id="statsGrid" class="stats-grid"></div>
+      </section>
+
       <div class="info">
         <span id="modeInfo">Modus: —</span>
         <span id="bufferInfo">Buffer: 0</span>
         <span id="counterInfo">Aantal: 0</span>
         <span id="requestInfo">Nog geen batch</span>
         <span id="nextRequestInfo">Volgende request: —</span>
-        <span>Versie 1.4.2</span>
+        <span>Versie 1.5.0</span>
       </div>
 
     </section>
@@ -269,14 +318,14 @@
   <script>
     "use strict";
 
-    const VERSION = "1.4.2";
+    const VERSION = "1.5.0";
 
     const QRNG_URL =
       "https://qrng.anu.edu.au/API/jsonI.php" +
       "?length=1024&type=uint16";
 
-    const SUCCESS_INTERVAL = 100_000;
-    const FAILURE_INTERVAL = 100_000;
+    const SUCCESS_INTERVAL = 60_000;
+    const FAILURE_INTERVAL = 90_000;
     const PREFETCH_THRESHOLD = 600;
 
     const RANDOM_STEPS_PER_SECOND = 10;
@@ -285,8 +334,15 @@
 
     const WALK_STEP_LENGTH = 10;
 
+    /*
+      Een positie telt als "dicht bij de rand"
+      wanneer deze binnen 10% van de veldbreedte
+      of veldhoogte ligt.
+    */
+    const EDGE_ZONE_PERCENTAGE = 0.10;
+
     const MAX_BRIGHTNESS_HISTORY = 1000;
-    const INITIAL_BRIGHTNESS = 25;
+    const INITIAL_BRIGHTNESS = 50;
 
     const BALL_SPAWN_INTERVAL = 700;
     const BALL_SPEED = 3.2;
@@ -342,6 +398,12 @@
     const nextRequestInfo =
       document.getElementById("nextRequestInfo");
 
+    const statsTitle =
+      document.getElementById("statsTitle");
+
+    const statsGrid =
+      document.getElementById("statsGrid");
+
     const canvas =
       document.getElementById("arena");
 
@@ -372,7 +434,21 @@
       x: WIDTH / 2,
       y: HEIGHT / 2,
       trail: [],
-      steps: 0
+      steps: 0,
+
+      edgeVisits: {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0
+      },
+
+      minimumDistance: {
+        top: HEIGHT / 2,
+        right: WIDTH / 2,
+        bottom: HEIGHT / 2,
+        left: WIDTH / 2
+      }
     };
 
     const waterfall = {
@@ -384,9 +460,12 @@
 
     const brightnessWalk = {
       x: WIDTH / 2,
-      y: HEIGHT * 0.75,
+      y: HEIGHT / 2,
       brightness: INITIAL_BRIGHTNESS,
       steps: 0,
+      brightnessSum: INITIAL_BRIGHTNESS,
+      minimumBrightness: INITIAL_BRIGHTNESS,
+      maximumBrightness: INITIAL_BRIGHTNESS,
       history: [INITIAL_BRIGHTNESS]
     };
 
@@ -396,6 +475,209 @@
       }
 
       return new Date(timestamp).toLocaleTimeString();
+    }
+
+    function percentage(part, total) {
+      if (total <= 0) {
+        return "0.00%";
+      }
+
+      return `${(part / total * 100).toFixed(2)}%`;
+    }
+
+    function createStat(label, value) {
+      return `
+        <div class="stat">
+          <span class="stat-label">${label}</span>
+          <span class="stat-value">${value}</span>
+        </div>
+      `;
+    }
+
+    function updateStatistics() {
+      if (currentMode === "walk") {
+        statsTitle.textContent =
+          "Randnabijheid huidige random-walk-run";
+
+        statsGrid.innerHTML = [
+          createStat(
+            "Bovenrand",
+            percentage(
+              walker.edgeVisits.top,
+              walker.steps
+            )
+          ),
+          createStat(
+            "Rechterrand",
+            percentage(
+              walker.edgeVisits.right,
+              walker.steps
+            )
+          ),
+          createStat(
+            "Onderste rand",
+            percentage(
+              walker.edgeVisits.bottom,
+              walker.steps
+            )
+          ),
+          createStat(
+            "Linkerrand",
+            percentage(
+              walker.edgeVisits.left,
+              walker.steps
+            )
+          ),
+          createStat(
+            "Dichtst boven",
+            `${walker.minimumDistance.top.toFixed(1)} px`
+          ),
+          createStat(
+            "Dichtst rechts",
+            `${walker.minimumDistance.right.toFixed(1)} px`
+          ),
+          createStat(
+            "Dichtst onder",
+            `${walker.minimumDistance.bottom.toFixed(1)} px`
+          ),
+          createStat(
+            "Dichtst links",
+            `${walker.minimumDistance.left.toFixed(1)} px`
+          )
+        ].join("");
+      }
+
+      if (currentMode === "brightness") {
+        statsTitle.textContent =
+          "Lichtsterkte huidige run";
+
+        const average =
+          brightnessWalk.steps > 0
+            ? brightnessWalk.brightnessSum /
+              (brightnessWalk.steps + 1)
+            : INITIAL_BRIGHTNESS;
+
+        statsGrid.innerHTML = [
+          createStat(
+            "Huidig",
+            `${brightnessWalk.brightness.toFixed(2)}%`
+          ),
+          createStat(
+            "Gemiddeld",
+            `${average.toFixed(2)}%`
+          ),
+          createStat(
+            "Minimum",
+            `${brightnessWalk.minimumBrightness.toFixed(2)}%`
+          ),
+          createStat(
+            "Maximum",
+            `${brightnessWalk.maximumBrightness.toFixed(2)}%`
+          ),
+          createStat(
+            "2D-positie X",
+            `${brightnessWalk.x.toFixed(1)} px`
+          ),
+          createStat(
+            "2D-positie Y",
+            `${brightnessWalk.y.toFixed(1)} px`
+          ),
+          createStat(
+            "Stappen",
+            brightnessWalk.steps
+          ),
+          createStat(
+            "Startwaarde",
+            `${INITIAL_BRIGHTNESS}%`
+          )
+        ].join("");
+      }
+
+      if (currentMode === "waterfall") {
+        statsTitle.textContent =
+          "Knikkerverdeling huidige run";
+
+        const total =
+          waterfall.completedBalls;
+
+        const weightedSum =
+          waterfall.bins.reduce(
+            (sum, count, index) =>
+              sum + count * index,
+            0
+          );
+
+        const averageBin =
+          total > 0
+            ? weightedSum / total
+            : 0;
+
+        const center =
+          PEG_ROWS / 2;
+
+        const leftCount =
+          waterfall.bins.reduce(
+            (sum, count, index) =>
+              index < center
+                ? sum + count
+                : sum,
+            0
+          );
+
+        const rightCount =
+          waterfall.bins.reduce(
+            (sum, count, index) =>
+              index > center
+                ? sum + count
+                : sum,
+            0
+          );
+
+        const centerCount =
+          waterfall.bins.reduce(
+            (sum, count, index) =>
+              index === Math.floor(center) ||
+              index === Math.ceil(center)
+                ? sum + count
+                : sum,
+            0
+          );
+
+        statsGrid.innerHTML = [
+          createStat(
+            "Totaal",
+            total
+          ),
+          createStat(
+            "Links",
+            percentage(leftCount, total)
+          ),
+          createStat(
+            "Midden",
+            percentage(centerCount, total)
+          ),
+          createStat(
+            "Rechts",
+            percentage(rightCount, total)
+          ),
+          createStat(
+            "Gemiddelde bak",
+            averageBin.toFixed(2)
+          ),
+          createStat(
+            "Aantal bakken",
+            waterfall.bins.length
+          ),
+          createStat(
+            "Meest gevuld",
+            Math.max(0, ...waterfall.bins)
+          ),
+          createStat(
+            "Actieve knikkers",
+            waterfall.balls.length
+          )
+        ].join("");
+      }
     }
 
     function updateInterface() {
@@ -439,6 +721,8 @@
         choiceStatus.textContent =
           "Wachten op quantumdata…";
       }
+
+      updateStatistics();
     }
 
     function clearRequestTimer() {
@@ -656,6 +940,80 @@
       walker.y = HEIGHT / 2;
       walker.trail = [];
       walker.steps = 0;
+
+      walker.edgeVisits = {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0
+      };
+
+      walker.minimumDistance = {
+        top: HEIGHT / 2,
+        right: WIDTH / 2,
+        bottom: HEIGHT / 2,
+        left: WIDTH / 2
+      };
+    }
+
+    function updateWalkStatistics() {
+      const horizontalZone =
+        WIDTH * EDGE_ZONE_PERCENTAGE;
+
+      const verticalZone =
+        HEIGHT * EDGE_ZONE_PERCENTAGE;
+
+      const topDistance =
+        walker.y;
+
+      const bottomDistance =
+        HEIGHT - walker.y;
+
+      const leftDistance =
+        walker.x;
+
+      const rightDistance =
+        WIDTH - walker.x;
+
+      if (topDistance <= verticalZone) {
+        walker.edgeVisits.top++;
+      }
+
+      if (rightDistance <= horizontalZone) {
+        walker.edgeVisits.right++;
+      }
+
+      if (bottomDistance <= verticalZone) {
+        walker.edgeVisits.bottom++;
+      }
+
+      if (leftDistance <= horizontalZone) {
+        walker.edgeVisits.left++;
+      }
+
+      walker.minimumDistance.top =
+        Math.min(
+          walker.minimumDistance.top,
+          topDistance
+        );
+
+      walker.minimumDistance.right =
+        Math.min(
+          walker.minimumDistance.right,
+          rightDistance
+        );
+
+      walker.minimumDistance.bottom =
+        Math.min(
+          walker.minimumDistance.bottom,
+          bottomDistance
+        );
+
+      walker.minimumDistance.left =
+        Math.min(
+          walker.minimumDistance.left,
+          leftDistance
+        );
     }
 
     function performWalkStep() {
@@ -712,6 +1070,8 @@
       });
 
       walker.steps++;
+
+      updateWalkStatistics();
       updateInterface();
     }
 
@@ -1047,17 +1407,22 @@
       brightnessWalk.x =
         WIDTH / 2;
 
-      /*
-        25% lichtsterkte betekent dat de verborgen
-        walker op 75% van de veldhoogte begint.
-      */
       brightnessWalk.y =
-        HEIGHT * 0.75;
+        HEIGHT / 2;
 
       brightnessWalk.brightness =
         INITIAL_BRIGHTNESS;
 
       brightnessWalk.steps = 0;
+
+      brightnessWalk.brightnessSum =
+        INITIAL_BRIGHTNESS;
+
+      brightnessWalk.minimumBrightness =
+        INITIAL_BRIGHTNESS;
+
+      brightnessWalk.maximumBrightness =
+        INITIAL_BRIGHTNESS;
 
       brightnessWalk.history = [
         INITIAL_BRIGHTNESS
@@ -1124,6 +1489,21 @@
         );
 
       brightnessWalk.steps++;
+
+      brightnessWalk.brightnessSum +=
+        brightnessWalk.brightness;
+
+      brightnessWalk.minimumBrightness =
+        Math.min(
+          brightnessWalk.minimumBrightness,
+          brightnessWalk.brightness
+        );
+
+      brightnessWalk.maximumBrightness =
+        Math.max(
+          brightnessWalk.maximumBrightness,
+          brightnessWalk.brightness
+        );
 
       brightnessWalk.history.push(
         brightnessWalk.brightness
@@ -1209,14 +1589,14 @@
         graphGrid;
 
       for (
-        let percentage = 0;
-        percentage <= 100;
-        percentage += 25
+        let percentageValue = 0;
+        percentageValue <= 100;
+        percentageValue += 25
       ) {
         const y =
           graphY +
           graphHeight -
-          percentage /
+          percentageValue /
           100 *
           graphHeight;
 
