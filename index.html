@@ -1,9 +1,9 @@
+```html
 <!DOCTYPE html>
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -217,46 +217,27 @@
         </div>
 
         <div class="choice-buttons">
-
-          <button
-            id="chooseWalkButton"
-            class="choice-button"
-            type="button"
-          >
+          <button id="chooseWalkButton" class="choice-button" type="button">
             <span class="choice-icon">〰️</span>
             <strong>Random Walk</strong>
             <small>Quantum-random richtingen</small>
           </button>
 
-          <button
-            id="chooseWaterfallButton"
-            class="choice-button"
-            type="button"
-          >
+          <button id="chooseWaterfallButton" class="choice-button" type="button">
             <span class="choice-icon">🔵</span>
             <strong>Knikkerwaterval</strong>
             <small>Quantum-random links/rechts</small>
           </button>
 
-          <button
-            id="chooseBrightnessButton"
-            class="choice-button"
-            type="button"
-          >
+          <button id="chooseBrightnessButton" class="choice-button" type="button">
             <span class="choice-icon">◐</span>
             <strong>Lichtsterkte-walk</strong>
             <small>Verborgen 2D-walk bepaalt grijstint</small>
           </button>
-
         </div>
 
-        <span id="choiceStatus">
-          Quantumdata laden…
-        </span>
-
-        <small>
-          Versie 1.5.0
-        </small>
+        <span id="choiceStatus">Quantumdata laden…</span>
+        <small>Versie 1.5.1</small>
 
       </div>
     </section>
@@ -264,38 +245,22 @@
     <section id="experimentScreen" hidden>
 
       <div class="toolbar">
+        <button id="startButton" type="button">Start</button>
 
-        <button id="startButton" type="button">
-          Start
-        </button>
-
-        <button
-          id="restartButton"
-          class="secondary"
-          type="button"
-        >
+        <button id="restartButton" class="secondary" type="button">
           Herstart
         </button>
 
-        <button
-          id="menuButton"
-          class="menu"
-          type="button"
-        >
+        <button id="menuButton" class="menu" type="button">
           Terug naar menu
         </button>
 
         <span id="status" class="status">
           Quantumdata laden…
         </span>
-
       </div>
 
-      <canvas
-        id="arena"
-        width="720"
-        height="720"
-      ></canvas>
+      <canvas id="arena" width="720" height="720"></canvas>
 
       <section class="stats-panel">
         <h2 id="statsTitle">Statistieken huidige run</h2>
@@ -308,7 +273,7 @@
         <span id="counterInfo">Aantal: 0</span>
         <span id="requestInfo">Nog geen batch</span>
         <span id="nextRequestInfo">Volgende request: —</span>
-        <span>Versie 1.5.0</span>
+        <span>Versie 1.5.1</span>
       </div>
 
     </section>
@@ -318,7 +283,7 @@
   <script>
     "use strict";
 
-    const VERSION = "1.5.0";
+    const VERSION = "1.5.1";
 
     const QRNG_URL =
       "https://qrng.anu.edu.au/API/jsonI.php" +
@@ -329,17 +294,8 @@
     const PREFETCH_THRESHOLD = 600;
 
     const RANDOM_STEPS_PER_SECOND = 10;
-    const RANDOM_STEP_INTERVAL =
-      1000 / RANDOM_STEPS_PER_SECOND;
-
+    const RANDOM_STEP_INTERVAL = 1000 / RANDOM_STEPS_PER_SECOND;
     const WALK_STEP_LENGTH = 10;
-
-    /*
-      Een positie telt als "dicht bij de rand"
-      wanneer deze binnen 10% van de veldbreedte
-      of veldhoogte ligt.
-    */
-    const EDGE_ZONE_PERCENTAGE = 0.10;
 
     const MAX_BRIGHTNESS_HISTORY = 1000;
     const INITIAL_BRIGHTNESS = 50;
@@ -353,62 +309,30 @@
     const PEG_VERTICAL_SPACING = 43;
     const PEG_RADIUS = 4;
 
-    const choiceScreen =
-      document.getElementById("choiceScreen");
+    const choiceScreen = document.getElementById("choiceScreen");
+    const experimentScreen = document.getElementById("experimentScreen");
 
-    const experimentScreen =
-      document.getElementById("experimentScreen");
+    const chooseWalkButton = document.getElementById("chooseWalkButton");
+    const chooseWaterfallButton = document.getElementById("chooseWaterfallButton");
+    const chooseBrightnessButton = document.getElementById("chooseBrightnessButton");
 
-    const chooseWalkButton =
-      document.getElementById("chooseWalkButton");
+    const choiceStatus = document.getElementById("choiceStatus");
+    const startButton = document.getElementById("startButton");
+    const restartButton = document.getElementById("restartButton");
+    const menuButton = document.getElementById("menuButton");
+    const statusElement = document.getElementById("status");
 
-    const chooseWaterfallButton =
-      document.getElementById("chooseWaterfallButton");
+    const modeInfo = document.getElementById("modeInfo");
+    const bufferInfo = document.getElementById("bufferInfo");
+    const counterInfo = document.getElementById("counterInfo");
+    const requestInfo = document.getElementById("requestInfo");
+    const nextRequestInfo = document.getElementById("nextRequestInfo");
 
-    const chooseBrightnessButton =
-      document.getElementById("chooseBrightnessButton");
+    const statsTitle = document.getElementById("statsTitle");
+    const statsGrid = document.getElementById("statsGrid");
 
-    const choiceStatus =
-      document.getElementById("choiceStatus");
-
-    const startButton =
-      document.getElementById("startButton");
-
-    const restartButton =
-      document.getElementById("restartButton");
-
-    const menuButton =
-      document.getElementById("menuButton");
-
-    const statusElement =
-      document.getElementById("status");
-
-    const modeInfo =
-      document.getElementById("modeInfo");
-
-    const bufferInfo =
-      document.getElementById("bufferInfo");
-
-    const counterInfo =
-      document.getElementById("counterInfo");
-
-    const requestInfo =
-      document.getElementById("requestInfo");
-
-    const nextRequestInfo =
-      document.getElementById("nextRequestInfo");
-
-    const statsTitle =
-      document.getElementById("statsTitle");
-
-    const statsGrid =
-      document.getElementById("statsGrid");
-
-    const canvas =
-      document.getElementById("arena");
-
-    const context =
-      canvas.getContext("2d");
+    const canvas = document.getElementById("arena");
+    const context = canvas.getContext("2d");
 
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
@@ -436,7 +360,7 @@
       trail: [],
       steps: 0,
 
-      edgeVisits: {
+      proximitySum: {
         top: 0,
         right: 0,
         bottom: 0,
@@ -470,19 +394,9 @@
     };
 
     function formatTime(timestamp) {
-      if (!timestamp) {
-        return "—";
-      }
-
-      return new Date(timestamp).toLocaleTimeString();
-    }
-
-    function percentage(part, total) {
-      if (total <= 0) {
-        return "0.00%";
-      }
-
-      return `${(part / total * 100).toFixed(2)}%`;
+      return timestamp
+        ? new Date(timestamp).toLocaleTimeString()
+        : "—";
     }
 
     function createStat(label, value) {
@@ -494,37 +408,49 @@
       `;
     }
 
+    function averageProximity(sum, steps) {
+      return steps > 0
+        ? `${(sum / steps).toFixed(2)}%`
+        : "0.00%";
+    }
+
+    function percentage(part, total) {
+      return total > 0
+        ? `${(part / total * 100).toFixed(2)}%`
+        : "0.00%";
+    }
+
     function updateStatistics() {
       if (currentMode === "walk") {
         statsTitle.textContent =
-          "Randnabijheid huidige random-walk-run";
+          "Gemiddelde nabijheid tot de vier randen";
 
         statsGrid.innerHTML = [
           createStat(
             "Bovenrand",
-            percentage(
-              walker.edgeVisits.top,
+            averageProximity(
+              walker.proximitySum.top,
               walker.steps
             )
           ),
           createStat(
             "Rechterrand",
-            percentage(
-              walker.edgeVisits.right,
+            averageProximity(
+              walker.proximitySum.right,
               walker.steps
             )
           ),
           createStat(
             "Onderste rand",
-            percentage(
-              walker.edgeVisits.bottom,
+            averageProximity(
+              walker.proximitySum.bottom,
               walker.steps
             )
           ),
           createStat(
             "Linkerrand",
-            percentage(
-              walker.edgeVisits.left,
+            averageProximity(
+              walker.proximitySum.left,
               walker.steps
             )
           ),
@@ -551,11 +477,12 @@
         statsTitle.textContent =
           "Lichtsterkte huidige run";
 
+        const sampleCount =
+          brightnessWalk.steps + 1;
+
         const average =
-          brightnessWalk.steps > 0
-            ? brightnessWalk.brightnessSum /
-              (brightnessWalk.steps + 1)
-            : INITIAL_BRIGHTNESS;
+          brightnessWalk.brightnessSum /
+          sampleCount;
 
         statsGrid.innerHTML = [
           createStat(
@@ -600,82 +527,40 @@
         const total =
           waterfall.completedBalls;
 
-        const weightedSum =
-          waterfall.bins.reduce(
-            (sum, count, index) =>
-              sum + count * index,
-            0
-          );
+        const center =
+          PEG_ROWS / 2;
+
+        let leftCount = 0;
+        let centerCount = 0;
+        let rightCount = 0;
+        let weightedSum = 0;
+
+        waterfall.bins.forEach((count, index) => {
+          weightedSum += count * index;
+
+          if (index < Math.floor(center)) {
+            leftCount += count;
+          } else if (index > Math.ceil(center)) {
+            rightCount += count;
+          } else {
+            centerCount += count;
+          }
+        });
 
         const averageBin =
           total > 0
             ? weightedSum / total
             : 0;
 
-        const center =
-          PEG_ROWS / 2;
-
-        const leftCount =
-          waterfall.bins.reduce(
-            (sum, count, index) =>
-              index < center
-                ? sum + count
-                : sum,
-            0
-          );
-
-        const rightCount =
-          waterfall.bins.reduce(
-            (sum, count, index) =>
-              index > center
-                ? sum + count
-                : sum,
-            0
-          );
-
-        const centerCount =
-          waterfall.bins.reduce(
-            (sum, count, index) =>
-              index === Math.floor(center) ||
-              index === Math.ceil(center)
-                ? sum + count
-                : sum,
-            0
-          );
-
         statsGrid.innerHTML = [
-          createStat(
-            "Totaal",
-            total
-          ),
-          createStat(
-            "Links",
-            percentage(leftCount, total)
-          ),
-          createStat(
-            "Midden",
-            percentage(centerCount, total)
-          ),
-          createStat(
-            "Rechts",
-            percentage(rightCount, total)
-          ),
-          createStat(
-            "Gemiddelde bak",
-            averageBin.toFixed(2)
-          ),
-          createStat(
-            "Aantal bakken",
-            waterfall.bins.length
-          ),
-          createStat(
-            "Meest gevuld",
-            Math.max(0, ...waterfall.bins)
-          ),
-          createStat(
-            "Actieve knikkers",
-            waterfall.balls.length
-          )
+          createStat("Totaal", total),
+          createStat("Links", percentage(leftCount, total)),
+          createStat("Midden", percentage(centerCount, total)),
+          createStat("Rechts", percentage(rightCount, total)),
+          createStat("Gemiddelde bak", averageBin.toFixed(2)),
+          createStat("Aantal bakken", waterfall.bins.length),
+          createStat("Meest gevuld", Math.max(0, ...waterfall.bins)),
+          createStat("Actieve knikkers", waterfall.balls.length)
         ].join("");
       }
     }
@@ -736,10 +621,7 @@
       clearRequestTimer();
 
       const delay =
-        Math.max(
-          0,
-          timestamp - Date.now()
-        );
+        Math.max(0, timestamp - Date.now());
 
       requestTimer = setTimeout(() => {
         requestTimer = null;
@@ -856,13 +738,11 @@
 
     function ensureQuantumSupply() {
       if (
-        quantumBuffer.length >
+        quantumBuffer.length <=
         PREFETCH_THRESHOLD
       ) {
-        return;
+        requestQuantumBatch();
       }
-
-      requestQuantumBatch();
     }
 
     function takeQuantumNumber() {
@@ -885,9 +765,7 @@
       wasRunningBeforeEmpty = running;
       running = false;
 
-      cancelAnimationFrame(
-        animationFrame
-      );
+      cancelAnimationFrame(animationFrame);
 
       startButton.textContent =
         "Start";
@@ -902,9 +780,7 @@
       running = false;
       currentMode = null;
 
-      cancelAnimationFrame(
-        animationFrame
-      );
+      cancelAnimationFrame(animationFrame);
 
       experimentScreen.hidden = true;
       choiceScreen.hidden = false;
@@ -941,7 +817,7 @@
       walker.trail = [];
       walker.steps = 0;
 
-      walker.edgeVisits = {
+      walker.proximitySum = {
         top: 0,
         right: 0,
         bottom: 0,
@@ -957,14 +833,11 @@
     }
 
     function updateWalkStatistics() {
-      const horizontalZone =
-        WIDTH * EDGE_ZONE_PERCENTAGE;
-
-      const verticalZone =
-        HEIGHT * EDGE_ZONE_PERCENTAGE;
-
       const topDistance =
         walker.y;
+
+      const rightDistance =
+        WIDTH - walker.x;
 
       const bottomDistance =
         HEIGHT - walker.y;
@@ -972,24 +845,21 @@
       const leftDistance =
         walker.x;
 
-      const rightDistance =
-        WIDTH - walker.x;
+      /*
+        100% betekent op de betreffende rand.
+        0% betekent op de tegenoverliggende rand.
+      */
+      walker.proximitySum.top +=
+        (1 - topDistance / HEIGHT) * 100;
 
-      if (topDistance <= verticalZone) {
-        walker.edgeVisits.top++;
-      }
+      walker.proximitySum.right +=
+        (1 - rightDistance / WIDTH) * 100;
 
-      if (rightDistance <= horizontalZone) {
-        walker.edgeVisits.right++;
-      }
+      walker.proximitySum.bottom +=
+        (1 - bottomDistance / HEIGHT) * 100;
 
-      if (bottomDistance <= verticalZone) {
-        walker.edgeVisits.bottom++;
-      }
-
-      if (leftDistance <= horizontalZone) {
-        walker.edgeVisits.left++;
-      }
+      walker.proximitySum.left +=
+        (1 - leftDistance / WIDTH) * 100;
 
       walker.minimumDistance.top =
         Math.min(
@@ -1076,62 +946,32 @@
     }
 
     function drawWalk() {
-      context.fillStyle =
-        "#010409";
-
-      context.fillRect(
-        0,
-        0,
-        WIDTH,
-        HEIGHT
-      );
+      context.fillStyle = "#010409";
+      context.fillRect(0, 0, WIDTH, HEIGHT);
 
       context.lineWidth = 1.5;
       context.lineCap = "round";
 
-      for (
-        let index = 0;
-        index < walker.trail.length;
-        index++
-      ) {
-        const segment =
-          walker.trail[index];
-
+      walker.trail.forEach((segment, index) => {
         const relativeAge =
           index /
-          Math.max(
-            1,
-            walker.trail.length
-          );
+          Math.max(1, walker.trail.length);
 
         const alpha =
           0.2 +
-          relativeAge *
-          0.75;
+          relativeAge * 0.75;
 
         context.strokeStyle =
           `rgba(88,166,255,${alpha})`;
 
         context.beginPath();
-
-        context.moveTo(
-          segment.x1,
-          segment.y1
-        );
-
-        context.lineTo(
-          segment.x2,
-          segment.y2
-        );
-
+        context.moveTo(segment.x1, segment.y1);
+        context.lineTo(segment.x2, segment.y2);
         context.stroke();
-      }
+      });
 
-      context.fillStyle =
-        "#f2cc60";
-
+      context.fillStyle = "#f2cc60";
       context.beginPath();
-
       context.arc(
         walker.x,
         walker.y,
@@ -1139,7 +979,6 @@
         0,
         Math.PI * 2
       );
-
       context.fill();
     }
 
@@ -1150,13 +989,8 @@
 
       const startY = 85;
 
-      for (
-        let row = 0;
-        row < PEG_ROWS;
-        row++
-      ) {
-        const pegsInRow =
-          row + 1;
+      for (let row = 0; row < PEG_ROWS; row++) {
+        const pegsInRow = row + 1;
 
         const rowWidth =
           (pegsInRow - 1) *
@@ -1275,30 +1109,17 @@
       }
 
       waterfall.balls =
-        waterfall.balls.filter(
-          updateBall
-        );
+        waterfall.balls.filter(updateBall);
     }
 
     function drawWaterfall() {
-      context.fillStyle =
-        "#010409";
+      context.fillStyle = "#010409";
+      context.fillRect(0, 0, WIDTH, HEIGHT);
 
-      context.fillRect(
-        0,
-        0,
-        WIDTH,
-        HEIGHT
-      );
+      context.fillStyle = "#8b949e";
 
-      context.fillStyle =
-        "#8b949e";
-
-      for (
-        const peg of waterfall.pegs
-      ) {
+      waterfall.pegs.forEach(peg => {
         context.beginPath();
-
         context.arc(
           peg.x,
           peg.y,
@@ -1306,18 +1127,13 @@
           0,
           Math.PI * 2
         );
-
         context.fill();
-      }
+      });
 
-      context.fillStyle =
-        "#58a6ff";
+      context.fillStyle = "#58a6ff";
 
-      for (
-        const ball of waterfall.balls
-      ) {
+      waterfall.balls.forEach(ball => {
         context.beginPath();
-
         context.arc(
           ball.x,
           ball.y,
@@ -1325,9 +1141,8 @@
           0,
           Math.PI * 2
         );
-
         context.fill();
-      }
+      });
 
       const binsTop =
         85 +
@@ -1340,25 +1155,12 @@
         waterfall.bins.length;
 
       const maximum =
-        Math.max(
-          1,
-          ...waterfall.bins
-        );
+        Math.max(1, ...waterfall.bins);
 
-      context.font =
-        "13px system-ui";
+      context.font = "13px system-ui";
+      context.textAlign = "center";
 
-      context.textAlign =
-        "center";
-
-      for (
-        let index = 0;
-        index < waterfall.bins.length;
-        index++
-      ) {
-        const count =
-          waterfall.bins[index];
-
+      waterfall.bins.forEach((count, index) => {
         const x =
           index * binWidth;
 
@@ -1372,8 +1174,7 @@
           maximum *
           maximumBarHeight;
 
-        context.strokeStyle =
-          "#484f58";
+        context.strokeStyle = "#484f58";
 
         context.strokeRect(
           x,
@@ -1392,41 +1193,25 @@
           barHeight
         );
 
-        context.fillStyle =
-          "#f0f6fc";
+        context.fillStyle = "#f0f6fc";
 
         context.fillText(
           String(count),
           x + binWidth / 2,
           HEIGHT - 10
         );
-      }
+      });
     }
 
     function resetBrightnessWalk() {
-      brightnessWalk.x =
-        WIDTH / 2;
-
-      brightnessWalk.y =
-        HEIGHT / 2;
-
-      brightnessWalk.brightness =
-        INITIAL_BRIGHTNESS;
-
+      brightnessWalk.x = WIDTH / 2;
+      brightnessWalk.y = HEIGHT / 2;
+      brightnessWalk.brightness = INITIAL_BRIGHTNESS;
       brightnessWalk.steps = 0;
-
-      brightnessWalk.brightnessSum =
-        INITIAL_BRIGHTNESS;
-
-      brightnessWalk.minimumBrightness =
-        INITIAL_BRIGHTNESS;
-
-      brightnessWalk.maximumBrightness =
-        INITIAL_BRIGHTNESS;
-
-      brightnessWalk.history = [
-        INITIAL_BRIGHTNESS
-      ];
+      brightnessWalk.brightnessSum = INITIAL_BRIGHTNESS;
+      brightnessWalk.minimumBrightness = INITIAL_BRIGHTNESS;
+      brightnessWalk.maximumBrightness = INITIAL_BRIGHTNESS;
+      brightnessWalk.history = [INITIAL_BRIGHTNESS];
     }
 
     function performBrightnessStep() {
@@ -1460,10 +1245,7 @@
       if (brightnessWalk.x > WIDTH) {
         brightnessWalk.x =
           WIDTH -
-          (
-            brightnessWalk.x -
-            WIDTH
-          );
+          (brightnessWalk.x - WIDTH);
       }
 
       if (brightnessWalk.y < 0) {
@@ -1474,10 +1256,7 @@
       if (brightnessWalk.y > HEIGHT) {
         brightnessWalk.y =
           HEIGHT -
-          (
-            brightnessWalk.y -
-            HEIGHT
-          );
+          (brightnessWalk.y - HEIGHT);
       }
 
       brightnessWalk.brightness =
@@ -1537,14 +1316,10 @@
         HEIGHT
       );
 
-      drawBrightnessGraph(
-        greyValue
-      );
+      drawBrightnessGraph(greyValue);
     }
 
-    function drawBrightnessGraph(
-      backgroundGrey
-    ) {
+    function drawBrightnessGraph(backgroundGrey) {
       const graphX = 28;
       const graphY = 28;
       const graphWidth = 280;
@@ -1560,12 +1335,7 @@
           ? "#ffffff"
           : "#f0f6fc";
 
-      const graphGrid =
-        "rgba(180,180,180,0.3)";
-
-      context.fillStyle =
-        graphBackground;
-
+      context.fillStyle = graphBackground;
       context.fillRect(
         graphX,
         graphY,
@@ -1573,11 +1343,8 @@
         graphHeight
       );
 
-      context.strokeStyle =
-        graphForeground;
-
+      context.strokeStyle = graphForeground;
       context.lineWidth = 1;
-
       context.strokeRect(
         graphX,
         graphY,
@@ -1586,56 +1353,36 @@
       );
 
       context.strokeStyle =
-        graphGrid;
+        "rgba(180,180,180,0.3)";
 
       for (
-        let percentageValue = 0;
-        percentageValue <= 100;
-        percentageValue += 25
+        let value = 0;
+        value <= 100;
+        value += 25
       ) {
         const y =
           graphY +
           graphHeight -
-          percentageValue /
+          value /
           100 *
           graphHeight;
 
         context.beginPath();
-
-        context.moveTo(
-          graphX,
-          y
-        );
-
-        context.lineTo(
-          graphX + graphWidth,
-          y
-        );
-
+        context.moveTo(graphX, y);
+        context.lineTo(graphX + graphWidth, y);
         context.stroke();
       }
 
-      context.fillStyle =
-        graphForeground;
+      context.fillStyle = graphForeground;
+      context.font = "12px system-ui";
+      context.textAlign = "left";
 
-      context.font =
-        "12px system-ui";
-
-      context.textAlign =
-        "left";
-
-      context.fillText(
-        "100",
-        graphX + 5,
-        graphY + 13
-      );
-
+      context.fillText("100", graphX + 5, graphY + 13);
       context.fillText(
         "50",
         graphX + 5,
         graphY + graphHeight / 2 + 4
       );
-
       context.fillText(
         "0",
         graphX + 5,
@@ -1655,31 +1402,21 @@
         return;
       }
 
-      context.strokeStyle =
-        graphForeground;
-
+      context.strokeStyle = graphForeground;
       context.lineWidth = 2;
-
       context.beginPath();
 
-      for (
-        let index = 0;
-        index < history.length;
-        index++
-      ) {
+      history.forEach((value, index) => {
         const x =
           graphX +
           index /
-          Math.max(
-            1,
-            history.length - 1
-          ) *
+          Math.max(1, history.length - 1) *
           graphWidth;
 
         const y =
           graphY +
           graphHeight -
-          history[index] /
+          value /
           100 *
           graphHeight;
 
@@ -1688,7 +1425,7 @@
         } else {
           context.lineTo(x, y);
         }
-      }
+      });
 
       context.stroke();
     }
@@ -1696,13 +1433,9 @@
     function drawCurrentMode() {
       if (currentMode === "walk") {
         drawWalk();
-      } else if (
-        currentMode === "waterfall"
-      ) {
+      } else if (currentMode === "waterfall") {
         drawWaterfall();
-      } else if (
-        currentMode === "brightness"
-      ) {
+      } else if (currentMode === "brightness") {
         drawBrightnessWalk();
       }
     }
@@ -1713,19 +1446,16 @@
       }
 
       if (previousFrameTime === 0) {
-        previousFrameTime =
-          timestamp;
+        previousFrameTime = timestamp;
       }
 
       const elapsed =
         Math.min(
           100,
-          timestamp -
-          previousFrameTime
+          timestamp - previousFrameTime
         );
 
-      previousFrameTime =
-        timestamp;
+      previousFrameTime = timestamp;
 
       if (
         currentMode === "walk" ||
@@ -1767,26 +1497,19 @@
       running = false;
       wasRunningBeforeEmpty = false;
 
-      cancelAnimationFrame(
-        animationFrame
-      );
+      cancelAnimationFrame(animationFrame);
 
       previousFrameTime = 0;
       accumulatedTime = 0;
       ballSpawnAccumulator = 0;
 
-      startButton.textContent =
-        "Start";
+      startButton.textContent = "Start";
 
       if (currentMode === "walk") {
         resetWalk();
-      } else if (
-        currentMode === "waterfall"
-      ) {
+      } else if (currentMode === "waterfall") {
         buildWaterfall();
-      } else if (
-        currentMode === "brightness"
-      ) {
+      } else if (currentMode === "brightness") {
         resetBrightnessWalk();
       }
 
@@ -1821,11 +1544,8 @@
       running = true;
       wasRunningBeforeEmpty = false;
 
-      startButton.textContent =
-        "Pauzeer";
-
-      statusElement.textContent =
-        "Experiment actief";
+      startButton.textContent = "Pauzeer";
+      statusElement.textContent = "Experiment actief";
 
       previousFrameTime = 0;
 
@@ -1837,23 +1557,17 @@
 
     chooseWalkButton.addEventListener(
       "click",
-      () => {
-        showExperiment("walk");
-      }
+      () => showExperiment("walk")
     );
 
     chooseWaterfallButton.addEventListener(
       "click",
-      () => {
-        showExperiment("waterfall");
-      }
+      () => showExperiment("waterfall")
     );
 
     chooseBrightnessButton.addEventListener(
       "click",
-      () => {
-        showExperiment("brightness");
-      }
+      () => showExperiment("brightness")
     );
 
     startButton.addEventListener(
@@ -1863,16 +1577,10 @@
           running = false;
           wasRunningBeforeEmpty = false;
 
-          cancelAnimationFrame(
-            animationFrame
-          );
+          cancelAnimationFrame(animationFrame);
 
-          startButton.textContent =
-            "Start";
-
-          statusElement.textContent =
-            "Gepauzeerd";
-
+          startButton.textContent = "Start";
+          statusElement.textContent = "Gepauzeerd";
           return;
         }
 
@@ -1922,3 +1630,4 @@
   </script>
 </body>
 </html>
+```
