@@ -1298,25 +1298,111 @@
     }
 
     function drawBrightnessWalk() {
-      const greyValue =
-        Math.round(
-          brightnessWalk.brightness /
-          100 *
-          255
-        );
+  const greyValue =
+    Math.round(
+      brightnessWalk.brightness /
+      100 *
+      255
+    );
 
-      context.fillStyle =
-        `rgb(${greyValue},${greyValue},${greyValue})`;
+  context.fillStyle =
+    `rgb(${greyValue},${greyValue},${greyValue})`;
 
-      context.fillRect(
-        0,
-        0,
-        WIDTH,
-        HEIGHT
-      );
+  context.fillRect(
+    0,
+    0,
+    WIDTH,
+    HEIGHT
+  );
 
-      drawBrightnessGraph(greyValue);
-    }
+  drawBrightnessGraph(greyValue);
+
+  // Toont het gemiddelde van alle lichtsterktes
+  // die tijdens de huidige run zijn gemaakt.
+  drawBrightnessRunAverage(greyValue);
+}
+
+function drawBrightnessRunAverage(backgroundGrey) {
+  /*
+    De beginwaarde van 50% telt mee als eerste meting.
+    Daarom is het aantal metingen gelijk aan:
+    aantal stappen + 1.
+  */
+  const sampleCount =
+    brightnessWalk.steps + 1;
+
+  const runningAverage =
+    brightnessWalk.brightnessSum /
+    sampleCount;
+
+  /*
+    Kies automatisch leesbare tekst en achtergrond,
+    afhankelijk van de actuele lichtsterkte.
+  */
+  const foreground =
+    backgroundGrey > 128
+      ? "#111111"
+      : "#ffffff";
+
+  const panelBackground =
+    backgroundGrey > 128
+      ? "rgba(255,255,255,0.72)"
+      : "rgba(0,0,0,0.62)";
+
+  const panelWidth = 226;
+  const panelHeight = 58;
+
+  // Positie rechtsboven in het canvas.
+  const panelX =
+    WIDTH -
+    panelWidth -
+    28;
+
+  const panelY = 28;
+
+  context.fillStyle =
+    panelBackground;
+
+  context.fillRect(
+    panelX,
+    panelY,
+    panelWidth,
+    panelHeight
+  );
+
+  context.strokeStyle =
+    foreground;
+
+  context.lineWidth = 1;
+
+  context.strokeRect(
+    panelX,
+    panelY,
+    panelWidth,
+    panelHeight
+  );
+
+  context.fillStyle =
+    foreground;
+
+  context.textAlign = "right";
+  context.font = "12px system-ui";
+
+  context.fillText(
+    "VOORTSCHRIJDEND GEMIDDELDE",
+    panelX + panelWidth - 12,
+    panelY + 18
+  );
+
+  context.font =
+    "bold 25px system-ui";
+
+  context.fillText(
+    `${runningAverage.toFixed(2)}%`,
+    panelX + panelWidth - 12,
+    panelY + 47
+  );
+}
 
     function drawBrightnessGraph(backgroundGrey) {
       const graphX = 28;
