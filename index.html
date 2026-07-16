@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -436,6 +436,356 @@
       }
     }
 
+  
+    /* Full-screen, no-scroll layout */
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      padding: clamp(8px, 1.4vw, 18px);
+      display: block;
+    }
+
+    .app {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      margin: 0 auto;
+      display: block;
+    }
+
+    .choice-screen,
+    #experimentScreen {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .choice-screen {
+      display: grid;
+      place-items: center;
+      padding: clamp(18px, 3vw, 42px);
+    }
+
+    .choice-panel {
+      width: min(100%, 1100px);
+      max-height: 100%;
+      gap: clamp(14px, 2.3vh, 28px);
+    }
+
+    .choice-panel h1 {
+      font-size: clamp(2rem, min(6vw, 8vh), 5.4rem);
+    }
+
+    .choice-panel p {
+      margin-top: 8px;
+      font-size: clamp(0.82rem, 1.6vh, 1rem);
+    }
+
+    .choice-panel > div:first-child::before {
+      margin-bottom: clamp(8px, 1.6vh, 16px);
+      font-size: clamp(0.92rem, 1.8vh, 1.15rem);
+    }
+
+    .choice-buttons {
+      gap: clamp(10px, 1.7vw, 18px);
+    }
+
+    .choice-button {
+      min-height: 0;
+      height: clamp(150px, 27vh, 245px);
+      padding: clamp(14px, 2.2vw, 24px);
+    }
+
+    .choice-icon {
+      width: clamp(52px, 7vh, 72px);
+      height: clamp(52px, 7vh, 72px);
+      font-size: clamp(1.45rem, 3vh, 2.1rem);
+    }
+
+    #experimentScreen {
+      padding: clamp(10px, 1.5vw, 20px);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto auto;
+      gap: clamp(8px, 1.2vh, 14px);
+    }
+
+    .toolbar {
+      margin: 0;
+      min-height: 0;
+      gap: 8px;
+    }
+
+    .toolbar button {
+      padding: clamp(8px, 1.1vh, 11px) clamp(13px, 1.6vw, 20px);
+      font-size: clamp(0.78rem, 1.4vh, 1rem);
+    }
+
+    .status {
+      padding: 7px 11px;
+      font-size: clamp(0.7rem, 1.2vh, 0.84rem);
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      aspect-ratio: auto;
+      object-fit: contain;
+      border-radius: clamp(14px, 2vw, 24px);
+    }
+
+    .stats-panel {
+      margin: 0;
+      padding: clamp(9px, 1.2vw, 14px);
+      gap: 8px;
+    }
+
+    .stats-panel h2 {
+      font-size: clamp(0.78rem, 1.35vh, 1rem);
+    }
+
+    .stats-grid {
+      gap: clamp(6px, 0.8vw, 10px);
+    }
+
+    .stat {
+      padding: clamp(7px, 1vh, 11px) 8px;
+    }
+
+    .stat-label {
+      font-size: clamp(0.58rem, 1.05vh, 0.72rem);
+      margin-bottom: 3px;
+    }
+
+    .stat-value {
+      font-size: clamp(0.72rem, 1.25vh, 0.98rem);
+    }
+
+    .info {
+      margin: 0;
+      padding: 0 2px;
+      gap: 4px 12px;
+      font-size: clamp(0.58rem, 1vh, 0.76rem);
+      line-height: 1.2;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 8px;
+      }
+
+      .choice-screen {
+        padding: 14px;
+      }
+
+      .choice-panel {
+        gap: 12px;
+      }
+
+      .choice-panel h1 {
+        font-size: clamp(1.8rem, 8vw, 3.4rem);
+      }
+
+      .choice-buttons {
+        grid-template-columns: 1fr;
+        min-height: 0;
+        gap: 8px;
+      }
+
+      .choice-button {
+        height: auto;
+        min-height: 0;
+        padding: 10px 13px;
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto auto;
+        grid-template-areas:
+          "icon title"
+          "icon description";
+        column-gap: 12px;
+        row-gap: 2px;
+      }
+
+      .choice-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 1.35rem;
+      }
+
+      .choice-button strong {
+        font-size: 0.95rem;
+      }
+
+      .choice-button small {
+        font-size: 0.72rem;
+      }
+
+      #choiceStatus,
+      .choice-panel > small {
+        font-size: 0.68rem;
+      }
+
+      #experimentScreen {
+        padding: 8px;
+        gap: 6px;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+      }
+
+      .toolbar button {
+        width: 100%;
+        padding: 8px 5px;
+        font-size: 0.69rem;
+      }
+
+      .status {
+        grid-column: 1 / -1;
+        width: 100%;
+        padding: 5px 8px;
+        font-size: 0.64rem;
+      }
+
+      .stats-panel {
+        padding: 7px;
+        gap: 5px;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
+      }
+
+      .stat {
+        min-width: 0;
+        padding: 5px 3px;
+        border-radius: 10px;
+      }
+
+      .stat-label {
+        font-size: 0.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .stat-value {
+        font-size: 0.62rem;
+        white-space: nowrap;
+      }
+
+      .info {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 2px 6px;
+        font-size: 0.48rem;
+      }
+
+      .info span {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+    }
+
+    @media (max-height: 720px) and (min-width: 761px) {
+      .choice-panel {
+        gap: 12px;
+      }
+
+      .choice-button {
+        height: clamp(130px, 24vh, 180px);
+      }
+
+      .choice-panel h1 {
+        font-size: clamp(2rem, 6vh, 4rem);
+      }
+
+      #experimentScreen {
+        padding: 10px;
+        gap: 7px;
+      }
+
+      .stats-panel {
+        padding: 8px;
+      }
+
+      .stat {
+        padding: 6px;
+      }
+
+      .info {
+        font-size: 0.58rem;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 600px) {
+      .choice-panel {
+        width: min(100%, 980px);
+        gap: 8px;
+      }
+
+      .choice-panel > div:first-child::before {
+        margin-bottom: 4px;
+      }
+
+      .choice-panel h1 {
+        font-size: clamp(1.8rem, 8vh, 3.2rem);
+      }
+
+      .choice-panel p {
+        margin-top: 3px;
+      }
+
+      .choice-button {
+        height: clamp(100px, 31vh, 150px);
+        padding: 10px;
+      }
+
+      #choiceStatus,
+      .choice-panel > small {
+        font-size: 0.62rem;
+      }
+
+      #experimentScreen {
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 31vw);
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+
+      .toolbar {
+        grid-column: 1 / -1;
+      }
+
+      canvas {
+        grid-column: 1;
+        grid-row: 2 / 4;
+      }
+
+      .stats-panel {
+        grid-column: 2;
+        grid-row: 2;
+        align-self: stretch;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .info {
+        grid-column: 2;
+        grid-row: 3;
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
   </style>
 </head>
 
@@ -446,32 +796,32 @@
       <div class="choice-panel">
 
         <div>
-          <h1>Quantum-cryptography</h1>
-          <p>Kies een visualisatie.</p>
+          <h1>Quantum Cryptography</h1>
+          <p>Choose a visualization.</p>
         </div>
 
         <div class="choice-buttons">
           <button id="chooseWalkButton" class="choice-button" type="button">
             <span class="choice-icon">〰️</span>
             <strong>Random Walk</strong>
-            <small>Quantum-random richtingen</small>
+            <small>Quantum-random directions</small>
           </button>
 
           <button id="chooseWaterfallButton" class="choice-button" type="button">
             <span class="choice-icon">🔵</span>
-            <strong>Knikkerwaterval</strong>
-            <small>Quantum-random links/rechts</small>
+            <strong>Ball Waterfall</strong>
+            <small>Quantum-random left/right</small>
           </button>
 
           <button id="chooseBrightnessButton" class="choice-button" type="button">
             <span class="choice-icon">◐</span>
-            <strong>Lichtsterkte-walk</strong>
-            <small>Verborgen 2D-walk bepaalt grijstint</small>
+            <strong>Brightness Walk</strong>
+            <small>Hidden 2D walk controls brightness</small>
           </button>
         </div>
 
-        <span id="choiceStatus">Quantumdata laden…</span>
-        <small>Versie 1.5.3</small>
+        <span id="choiceStatus">Loading quantum data…</span>
+        <small>Version 1.5.3</small>
 
       </div>
     </section>
@@ -482,32 +832,32 @@
         <button id="startButton" type="button">Start</button>
 
         <button id="restartButton" class="secondary" type="button">
-          Herstart
+          Restart
         </button>
 
         <button id="menuButton" class="menu" type="button">
-          Terug naar menu
+          Back to menu
         </button>
 
         <span id="status" class="status">
-          Quantumdata laden…
+          Loading quantum data…
         </span>
       </div>
 
       <canvas id="arena" width="720" height="720"></canvas>
 
       <section class="stats-panel">
-        <h2 id="statsTitle">Statistieken huidige run</h2>
+        <h2 id="statsTitle">Current Run Statistics</h2>
         <div id="statsGrid" class="stats-grid"></div>
       </section>
 
       <div class="info">
-        <span id="modeInfo">Modus: —</span>
+        <span id="modeInfo">Mode: —</span>
         <span id="bufferInfo">Buffer: 0</span>
-        <span id="counterInfo">Aantal: 0</span>
-        <span id="requestInfo">Nog geen batch</span>
-        <span id="nextRequestInfo">Volgende request: —</span>
-        <span>Versie 1.5.3</span>
+        <span id="counterInfo">Count: 0</span>
+        <span id="requestInfo">No batch yet</span>
+        <span id="nextRequestInfo">Next request: —</span>
+        <span>Version 1.5.3</span>
       </div>
 
     </section>
@@ -659,51 +1009,51 @@
     function updateStatistics() {
       if (currentMode === "walk") {
         statsTitle.textContent =
-          "Gemiddelde nabijheid tot de vier randen";
+          "Average Proximity to the Four Edges";
 
         statsGrid.innerHTML = [
           createStat(
-            "Bovenrand",
+            "Top edge",
             averageProximity(
               walker.proximitySum.top,
               walker.steps
             )
           ),
           createStat(
-            "Rechterrand",
+            "Right edge",
             averageProximity(
               walker.proximitySum.right,
               walker.steps
             )
           ),
           createStat(
-            "Onderste rand",
+            "Bottom edge",
             averageProximity(
               walker.proximitySum.bottom,
               walker.steps
             )
           ),
           createStat(
-            "Linkerrand",
+            "Left edge",
             averageProximity(
               walker.proximitySum.left,
               walker.steps
             )
           ),
           createStat(
-            "Dichtst boven",
+            "Closest to top",
             `${walker.minimumDistance.top.toFixed(1)} px`
           ),
           createStat(
-            "Dichtst rechts",
+            "Closest to right",
             `${walker.minimumDistance.right.toFixed(1)} px`
           ),
           createStat(
-            "Dichtst onder",
+            "Closest to bottom",
             `${walker.minimumDistance.bottom.toFixed(1)} px`
           ),
           createStat(
-            "Dichtst links",
+            "Closest to left",
             `${walker.minimumDistance.left.toFixed(1)} px`
           )
         ].join("");
@@ -711,7 +1061,7 @@
 
       if (currentMode === "brightness") {
         statsTitle.textContent =
-          "Lichtsterkte huidige run";
+          "Brightness During Current Run";
 
         const sampleCount =
           brightnessWalk.steps + 1;
@@ -722,11 +1072,11 @@
 
         statsGrid.innerHTML = [
           createStat(
-            "Huidig",
+            "Current",
             `${brightnessWalk.brightness.toFixed(2)}%`
           ),
           createStat(
-            "Gemiddeld",
+            "Average",
             `${average.toFixed(2)}%`
           ),
           createStat(
@@ -738,19 +1088,19 @@
             `${brightnessWalk.maximumBrightness.toFixed(2)}%`
           ),
           createStat(
-            "2D-positie X",
+            "2D Position X",
             `${brightnessWalk.x.toFixed(1)} px`
           ),
           createStat(
-            "2D-positie Y",
+            "2D Position Y",
             `${brightnessWalk.y.toFixed(1)} px`
           ),
           createStat(
-            "Stappen",
+            "Steps",
             brightnessWalk.steps
           ),
           createStat(
-            "Startwaarde",
+            "Starting Value",
             `${INITIAL_BRIGHTNESS}%`
           )
         ].join("");
@@ -758,7 +1108,7 @@
 
       if (currentMode === "waterfall") {
         statsTitle.textContent =
-          "Knikkerverdeling huidige run";
+          "Ball Distribution During Current Run";
 
         const total =
           waterfall.completedBalls;
@@ -789,14 +1139,14 @@
             : 0;
 
         statsGrid.innerHTML = [
-          createStat("Totaal", total),
-          createStat("Links", percentage(leftCount, total)),
-          createStat("Midden", percentage(centerCount, total)),
-          createStat("Rechts", percentage(rightCount, total)),
-          createStat("Gemiddelde bak", averageBin.toFixed(2)),
-          createStat("Aantal bakken", waterfall.bins.length),
-          createStat("Meest gevuld", Math.max(0, ...waterfall.bins)),
-          createStat("Actieve knikkers", waterfall.balls.length)
+          createStat("Total", total),
+          createStat("Left", percentage(leftCount, total)),
+          createStat("Center", percentage(centerCount, total)),
+          createStat("Right", percentage(rightCount, total)),
+          createStat("Averagee bak", averageBin.toFixed(2)),
+          createStat("Number of Bins", waterfall.bins.length),
+          createStat("Most Filled", Math.max(0, ...waterfall.bins)),
+          createStat("Active Balls", waterfall.balls.length)
         ].join("");
       }
     }
@@ -807,41 +1157,41 @@
 
       if (currentMode === "walk") {
         counterInfo.textContent =
-          `Stappen: ${walker.steps}`;
+          `Steps: ${walker.steps}`;
       } else if (currentMode === "waterfall") {
         counterInfo.textContent =
-          `Knikkers: ${waterfall.completedBalls}`;
+          `Balls: ${waterfall.completedBalls}`;
       } else if (currentMode === "brightness") {
         counterInfo.textContent =
-          `Lichtsterkte: ${brightnessWalk.brightness.toFixed(2)}%`;
+          `Brightness: ${brightnessWalk.brightness.toFixed(2)}%`;
       } else {
         counterInfo.textContent =
-          "Aantal: 0";
+          "Count: 0";
       }
 
       requestInfo.textContent =
         lastSuccessfulRequest > 0
-          ? `Laatste batch: ${formatTime(lastSuccessfulRequest)}`
-          : "Nog geen batch";
+          ? `Last batch: ${formatTime(lastSuccessfulRequest)}`
+          : "No batch yet";
 
       nextRequestInfo.textContent =
         nextRequestAllowedAt > Date.now()
-          ? `Volgende request: ${formatTime(nextRequestAllowedAt)}`
-          : "Volgende request: beschikbaar";
+          ? `Next request: ${formatTime(nextRequestAllowedAt)}`
+          : "Next request: available";
 
       if (requestBusy) {
         choiceStatus.textContent = localFallbackActive
-          ? "Lokale random actief · quantumdata ophalen…"
-          : "Quantumdata ophalen…";
+          ? "Local random active · fetching quantum data…"
+          : "Fetching quantum data…";
       } else if (quantumBuffer.length > 0) {
         choiceStatus.textContent =
-          `Quantumdata gereed · buffer ${quantumBuffer.length}`;
+          `Quantum data ready · buffer ${quantumBuffer.length}`;
       } else if (lastRequestError || localFallbackActive) {
         choiceStatus.textContent =
-          "Lokale JavaScript-random actief · QRNG-retry gepland";
+          "Local JavaScript random active · QRNG retry scheduled";
       } else {
         choiceStatus.textContent =
-          "Wachten op quantumdata…";
+          "Waiting for quantum data…";
       }
 
       updateStatistics();
@@ -886,7 +1236,7 @@
       lastRequestError = null;
 
       statusElement.textContent =
-        "Quantumdata ophalen…";
+        "Fetching quantum data…";
 
       updateInterface();
 
@@ -900,7 +1250,7 @@
 
         if (!response.ok) {
           throw new Error(
-            `HTTP-fout ${response.status}`
+            `HTTP error ${response.status}`
           );
         }
 
@@ -913,7 +1263,7 @@
           result.data.length === 0
         ) {
           throw new Error(
-            "Ongeldig QRNG-antwoord"
+            "Invalid QRNG response"
           );
         }
 
@@ -929,8 +1279,8 @@
 
         statusElement.textContent =
           running
-            ? "Experiment actief · ANU-quantumdata"
-            : "Quantumdata gereed";
+            ? "Experiment active · ANU quantum data"
+            : "Quantum data ready";
 
         updateInterface();
 
@@ -947,7 +1297,7 @@
 
       } catch (error) {
         console.error(
-          "QRNG-request mislukt:",
+          "QRNG request failed:",
           error
         );
 
@@ -963,8 +1313,8 @@
 
         statusElement.textContent =
           quantumBuffer.length > 0
-            ? "QRNG-fout · bestaande quantumbuffer actief"
-            : "QRNG-fout · lokale JavaScript-random actief";
+            ? "QRNG error · existing quantum buffer active"
+            : "QRNG error · local JavaScript random active";
 
         scheduleRequestAt(
           nextRequestAllowedAt
@@ -1008,7 +1358,7 @@
         localFallbackCount++;
 
         statusElement.textContent =
-          "Experiment actief · lokale JavaScript-random";
+          "Experiment active · local JavaScript random";
 
         updateInterface();
         return createLocalRandomUint16();
@@ -1047,13 +1397,13 @@
 
       if (mode === "walk") {
         modeInfo.textContent =
-          "Modus: Random Walk";
+          "Mode: Random Walk";
       } else if (mode === "waterfall") {
         modeInfo.textContent =
-          "Modus: Knikkerwaterval";
+          "Modus: Ball Waterfall";
       } else {
         modeInfo.textContent =
-          "Modus: Lichtsterkte via 2D-walk";
+          "Modus: Brightness via 2D-walk";
       }
 
       resetCurrentExperiment();
@@ -1094,8 +1444,8 @@
         walker.x;
 
       /*
-        100% betekent op de betreffende rand.
-        0% betekent op de tegenoverliggende rand.
+        100% means the walker is on that edge.
+        0% means the walker is on the opposite edge.
       */
       walker.proximitySum.top +=
         (1 - topDistance / HEIGHT) * 100;
@@ -1597,7 +1947,7 @@
       context.textAlign = "right";
       context.font = "12px system-ui";
       context.fillText(
-        "VOORTSCHRIJDEND GEMIDDELDE",
+        "RUNNING AVERAGE",
         panelX + panelWidth - 12,
         panelY + 18
       );
@@ -1806,11 +2156,12 @@
 
       statusElement.textContent =
         quantumBuffer.length > 0
-          ? "Quantumdata gereed"
-          : "Quantumdata laden · lokale fallback beschikbaar";
+          ? "Quantum data ready"
+          : "Quantumdata laden · lokale fallback available";
 
       updateInterface();
       drawCurrentMode();
+      fitCanvasToAvailableSpace();
       ensureQuantumSupply();
     }
 
@@ -1830,11 +2181,11 @@
       running = true;
       wasRunningBeforeEmpty = false;
 
-      startButton.textContent = "Pauzeer";
+      startButton.textContent = "Pause";
       statusElement.textContent =
         quantumBuffer.length > 0
-          ? "Experiment actief · ANU-quantumdata"
-          : "Experiment actief · lokale JavaScript-random";
+          ? "Experiment active · ANU quantum data"
+          : "Experiment active · local JavaScript random";
 
       previousFrameTime = 0;
 
@@ -1869,7 +2220,7 @@
           cancelAnimationFrame(animationFrame);
 
           startButton.textContent = "Start";
-          statusElement.textContent = "Gepauzeerd";
+          statusElement.textContent = "Paused";
           return;
         }
 
@@ -1900,6 +2251,32 @@
       1_000
     );
 
+
+    function fitCanvasToAvailableSpace() {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const targetRatio = WIDTH / HEIGHT;
+      let cssWidth = rect.width;
+      let cssHeight = rect.height;
+
+      if (cssWidth / cssHeight > targetRatio) {
+        cssWidth = cssHeight * targetRatio;
+      } else {
+        cssHeight = cssWidth / targetRatio;
+      }
+
+      canvas.style.width = `${cssWidth}px`;
+      canvas.style.height = `${cssHeight}px`;
+      canvas.style.justifySelf = "center";
+      canvas.style.alignSelf = "center";
+    }
+
+    window.addEventListener("resize", fitCanvasToAvailableSpace);
+    window.addEventListener("orientationchange", () => {
+      setTimeout(fitCanvasToAvailableSpace, 100);
+    });
+
     async function initialize() {
       showMenu();
 
@@ -1909,6 +2286,7 @@
 
       updateInterface();
 
+      fitCanvasToAvailableSpace();
       await requestQuantumBatch();
     }
 
