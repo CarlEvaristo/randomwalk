@@ -786,6 +786,221 @@
       }
     }
 
+  
+    /* Larger arena with controls and statistics beside it */
+    #experimentScreen {
+      grid-template-columns: minmax(0, 1fr) clamp(260px, 29vw, 360px);
+      grid-template-rows: minmax(0, 1fr);
+      align-items: stretch;
+      gap: clamp(12px, 1.8vw, 22px);
+    }
+
+    #arena {
+      grid-column: 1;
+      grid-row: 1;
+      width: 100% !important;
+      height: 100% !important;
+      align-self: stretch !important;
+      justify-self: stretch !important;
+      min-width: 0;
+      min-height: 0;
+      border-radius: 30px;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(255, 116, 62, 0.25), transparent 30%),
+        radial-gradient(circle at 82% 18%, rgba(49, 221, 210, 0.20), transparent 28%),
+        radial-gradient(circle at 72% 86%, rgba(117, 35, 228, 0.34), transparent 36%),
+        linear-gradient(145deg, #4c0f88 0%, #8d0f9f 42%, #d80b83 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.24),
+        inset 0 0 70px rgba(37, 4, 63, 0.28),
+        0 26px 70px rgba(35, 3, 61, 0.38);
+    }
+
+    .control-panel {
+      grid-column: 2;
+      grid-row: 1;
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 26px;
+      background:
+        linear-gradient(160deg, rgba(255,255,255,0.13), rgba(255,255,255,0.035)),
+        rgba(52, 10, 89, 0.5);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.18),
+        0 22px 54px rgba(35, 3, 61, 0.25);
+      overflow: hidden;
+    }
+
+    .control-panel .toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .control-panel .toolbar button {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .control-panel .toolbar .menu {
+      grid-column: 1 / -1;
+    }
+
+    .control-panel .status {
+      grid-column: 1 / -1;
+      width: 100%;
+      margin: 0;
+      text-align: center;
+      white-space: normal;
+      line-height: 1.25;
+    }
+
+    .control-panel .stats-panel {
+      min-height: 0;
+      overflow: hidden;
+      margin: 0;
+      padding: 12px;
+      background:
+        linear-gradient(145deg, rgba(255,255,255,0.11), rgba(255,255,255,0.035)),
+        rgba(34, 8, 60, 0.36);
+    }
+
+    .control-panel .stats-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-content: start;
+      overflow: auto;
+      scrollbar-width: thin;
+    }
+
+    .control-panel .stat {
+      background:
+        linear-gradient(145deg, rgba(255, 90, 145, 0.20), rgba(96, 31, 207, 0.22));
+    }
+
+    .control-panel .info {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 5px;
+      padding: 8px 2px 0;
+    }
+
+    .control-panel .info span {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 820px) {
+      #experimentScreen {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) auto;
+        gap: 8px;
+      }
+
+      #arena {
+        grid-column: 1;
+        grid-row: 1;
+        border-radius: 22px;
+      }
+
+      .control-panel {
+        grid-column: 1;
+        grid-row: 2;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        gap: 7px;
+        padding: 8px;
+        border-radius: 20px;
+      }
+
+      .control-panel .toolbar {
+        grid-column: 1;
+        grid-row: 1 / 3;
+        width: min(38vw, 150px);
+        grid-template-columns: 1fr;
+        align-content: start;
+      }
+
+      .control-panel .toolbar .menu,
+      .control-panel .status {
+        grid-column: 1;
+      }
+
+      .control-panel .stats-panel {
+        grid-column: 2;
+        grid-row: 1;
+        padding: 7px;
+      }
+
+      .control-panel .stats-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
+      }
+
+      .control-panel .info {
+        grid-column: 2;
+        grid-row: 2;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 3px;
+        padding: 0;
+      }
+
+      .control-panel .info span {
+        font-size: 0.48rem;
+        padding: 3px 5px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 600px) {
+      #experimentScreen {
+        grid-template-columns: minmax(0, 1fr) clamp(235px, 31vw, 320px);
+        grid-template-rows: minmax(0, 1fr);
+      }
+
+      #arena {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      .control-panel {
+        grid-column: 2;
+        grid-row: 1;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+
+      .control-panel .toolbar {
+        grid-column: 1;
+        grid-row: 1;
+        width: auto;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .control-panel .toolbar .menu,
+      .control-panel .status {
+        grid-column: 1 / -1;
+      }
+
+      .control-panel .stats-panel {
+        grid-column: 1;
+        grid-row: 2;
+      }
+
+      .control-panel .info {
+        grid-column: 1;
+        grid-row: 3;
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
   </style>
 </head>
 
@@ -828,37 +1043,39 @@
 
     <section id="experimentScreen" hidden>
 
-      <div class="toolbar">
-        <button id="startButton" type="button">Start</button>
-
-        <button id="restartButton" class="secondary" type="button">
-          Restart
-        </button>
-
-        <button id="menuButton" class="menu" type="button">
-          Back to menu
-        </button>
-
-        <span id="status" class="status">
-          Loading quantum data…
-        </span>
-      </div>
-
       <canvas id="arena" width="720" height="720"></canvas>
 
-      <section class="stats-panel">
-        <h2 id="statsTitle">Current Run Statistics</h2>
-        <div id="statsGrid" class="stats-grid"></div>
-      </section>
+      <aside class="control-panel">
+        <div class="toolbar">
+          <button id="startButton" type="button">Start</button>
 
-      <div class="info">
-        <span id="modeInfo">Mode: —</span>
-        <span id="bufferInfo">Buffer: 0</span>
-        <span id="counterInfo">Count: 0</span>
-        <span id="requestInfo">No batch yet</span>
-        <span id="nextRequestInfo">Next request: —</span>
-        <span>Version 1.5.3</span>
-      </div>
+          <button id="restartButton" class="secondary" type="button">
+            Restart
+          </button>
+
+          <button id="menuButton" class="menu" type="button">
+            Back to menu
+          </button>
+
+          <span id="status" class="status">
+            Loading quantum data…
+          </span>
+        </div>
+
+        <section class="stats-panel">
+          <h2 id="statsTitle">Current Run Statistics</h2>
+          <div id="statsGrid" class="stats-grid"></div>
+        </section>
+
+        <div class="info">
+          <span id="modeInfo">Mode: —</span>
+          <span id="bufferInfo">Buffer: 0</span>
+          <span id="counterInfo">Count: 0</span>
+          <span id="requestInfo">No batch yet</span>
+          <span id="nextRequestInfo">Next request: —</span>
+          <span>Version 1.5.3</span>
+        </div>
+      </aside>
 
     </section>
 
@@ -1538,41 +1755,84 @@
       updateInterface();
     }
 
-    function drawWalk() {
-      context.fillStyle = "#010409";
+
+    function createArenaGradient() {
+      const gradient = context.createLinearGradient(0, 0, WIDTH, HEIGHT);
+      gradient.addColorStop(0, "#4b128a");
+      gradient.addColorStop(0.42, "#8910a1");
+      gradient.addColorStop(1, "#d80b82");
+      return gradient;
+    }
+
+    function drawArenaBackground() {
+      context.fillStyle = createArenaGradient();
       context.fillRect(0, 0, WIDTH, HEIGHT);
 
+      const glowOne = context.createRadialGradient(
+        WIDTH * 0.16, HEIGHT * 0.12, 10,
+        WIDTH * 0.16, HEIGHT * 0.12, WIDTH * 0.42
+      );
+      glowOne.addColorStop(0, "rgba(255,126,67,0.72)");
+      glowOne.addColorStop(1, "rgba(255,126,67,0)");
+      context.fillStyle = glowOne;
+      context.fillRect(0, 0, WIDTH, HEIGHT);
+
+      const glowTwo = context.createRadialGradient(
+        WIDTH * 0.82, HEIGHT * 0.18, 8,
+        WIDTH * 0.82, HEIGHT * 0.18, WIDTH * 0.35
+      );
+      glowTwo.addColorStop(0, "rgba(49,221,210,0.62)");
+      glowTwo.addColorStop(1, "rgba(49,221,210,0)");
+      context.fillStyle = glowTwo;
+      context.fillRect(0, 0, WIDTH, HEIGHT);
+
+      context.strokeStyle = "rgba(255,255,255,0.12)";
+      context.lineWidth = 2;
+      context.strokeRect(1, 1, WIDTH - 2, HEIGHT - 2);
+    }
+
+    function drawGlassPanel(x, y, width, height, radius = 18) {
+      context.save();
+      context.beginPath();
+      context.roundRect(x, y, width, height, radius);
+      context.fillStyle = "rgba(39,8,68,0.46)";
+      context.fill();
+      context.strokeStyle = "rgba(255,255,255,0.18)";
       context.lineWidth = 1.5;
+      context.stroke();
+      context.restore();
+    }
+
+    function drawWalk() {
+      drawArenaBackground();
+
+      context.lineWidth = 2.2;
       context.lineCap = "round";
 
       walker.trail.forEach((segment, index) => {
-        const relativeAge =
-          index /
-          Math.max(1, walker.trail.length);
+        const relativeAge = index / Math.max(1, walker.trail.length);
+        const alpha = 0.16 + relativeAge * 0.82;
 
-        const alpha =
-          0.2 +
-          relativeAge * 0.75;
+        const trailGradient = context.createLinearGradient(
+          segment.x1, segment.y1, segment.x2, segment.y2
+        );
+        trailGradient.addColorStop(0, `rgba(49,221,210,${alpha * 0.72})`);
+        trailGradient.addColorStop(1, `rgba(255,255,255,${alpha})`);
 
-        context.strokeStyle =
-          `rgba(88,166,255,${alpha})`;
-
+        context.strokeStyle = trailGradient;
         context.beginPath();
         context.moveTo(segment.x1, segment.y1);
         context.lineTo(segment.x2, segment.y2);
         context.stroke();
       });
 
-      context.fillStyle = "#f2cc60";
+      context.shadowColor = "rgba(255,126,67,0.95)";
+      context.shadowBlur = 22;
+      context.fillStyle = "#ffb14a";
       context.beginPath();
-      context.arc(
-        walker.x,
-        walker.y,
-        4.5,
-        0,
-        Math.PI * 2
-      );
+      context.arc(walker.x, walker.y, 7, 0, Math.PI * 2);
       context.fill();
+      context.shadowBlur = 0;
     }
 
     function buildWaterfall() {
@@ -1701,93 +1961,55 @@
     }
 
     function drawWaterfall() {
-      context.fillStyle = "#010409";
-      context.fillRect(0, 0, WIDTH, HEIGHT);
+      drawArenaBackground();
 
-      context.fillStyle = "#8b949e";
+      context.shadowColor = "rgba(49,221,210,0.55)";
+      context.shadowBlur = 10;
+      context.fillStyle = "rgba(255,255,255,0.84)";
 
       waterfall.pegs.forEach(peg => {
         context.beginPath();
-        context.arc(
-          peg.x,
-          peg.y,
-          PEG_RADIUS,
-          0,
-          Math.PI * 2
-        );
+        context.arc(peg.x, peg.y, PEG_RADIUS + 0.7, 0, Math.PI * 2);
         context.fill();
       });
 
-      context.fillStyle = "#58a6ff";
+      context.shadowColor = "rgba(255,104,60,0.9)";
+      context.shadowBlur = 18;
+      context.fillStyle = "#ff9b49";
 
       waterfall.balls.forEach(ball => {
         context.beginPath();
-        context.arc(
-          ball.x,
-          ball.y,
-          BALL_RADIUS,
-          0,
-          Math.PI * 2
-        );
+        context.arc(ball.x, ball.y, BALL_RADIUS + 1, 0, Math.PI * 2);
         context.fill();
       });
+      context.shadowBlur = 0;
 
-      const binsTop =
-        85 +
-        PEG_ROWS *
-        PEG_VERTICAL_SPACING +
-        18;
+      const binsTop = 85 + PEG_ROWS * PEG_VERTICAL_SPACING + 18;
+      const binWidth = WIDTH / waterfall.bins.length;
+      const maximum = Math.max(1, ...waterfall.bins);
 
-      const binWidth =
-        WIDTH /
-        waterfall.bins.length;
-
-      const maximum =
-        Math.max(1, ...waterfall.bins);
-
-      context.font = "13px system-ui";
+      context.font = "600 13px system-ui";
       context.textAlign = "center";
 
       waterfall.bins.forEach((count, index) => {
-        const x =
-          index * binWidth;
+        const x = index * binWidth;
+        const maximumBarHeight = HEIGHT - binsTop - 42;
+        const barHeight = count / maximum * maximumBarHeight;
 
-        const maximumBarHeight =
-          HEIGHT -
-          binsTop -
-          42;
+        context.fillStyle = "rgba(31,7,55,0.35)";
+        context.fillRect(x + 2, binsTop, binWidth - 4, HEIGHT - binsTop - 30);
 
-        const barHeight =
-          count /
-          maximum *
-          maximumBarHeight;
+        const barGradient = context.createLinearGradient(0, HEIGHT - 32, 0, HEIGHT - 32 - barHeight);
+        barGradient.addColorStop(0, "rgba(255,22,123,0.92)");
+        barGradient.addColorStop(1, "rgba(49,221,210,0.92)");
+        context.fillStyle = barGradient;
+        context.fillRect(x + 4, HEIGHT - 32 - barHeight, binWidth - 8, barHeight);
 
-        context.strokeStyle = "#484f58";
+        context.strokeStyle = "rgba(255,255,255,0.16)";
+        context.strokeRect(x + 2, binsTop, binWidth - 4, HEIGHT - binsTop - 30);
 
-        context.strokeRect(
-          x,
-          binsTop,
-          binWidth,
-          HEIGHT - binsTop - 30
-        );
-
-        context.fillStyle =
-          "rgba(88,166,255,0.6)";
-
-        context.fillRect(
-          x + 2,
-          HEIGHT - 32 - barHeight,
-          binWidth - 4,
-          barHeight
-        );
-
-        context.fillStyle = "#f0f6fc";
-
-        context.fillText(
-          String(count),
-          x + binWidth / 2,
-          HEIGHT - 10
-        );
+        context.fillStyle = "rgba(255,255,255,0.92)";
+        context.fillText(String(count), x + binWidth / 2, HEIGHT - 10);
       });
     }
 
@@ -1882,22 +2104,21 @@
     }
 
     function drawBrightnessWalk() {
-      const greyValue =
-        Math.round(
-          brightnessWalk.brightness /
-          100 *
-          255
-        );
+      const greyValue = Math.round(brightnessWalk.brightness / 100 * 255);
 
-      context.fillStyle =
-        `rgb(${greyValue},${greyValue},${greyValue})`;
+      drawArenaBackground();
 
-      context.fillRect(
+      const brightnessOverlay = context.createLinearGradient(0, HEIGHT, WIDTH, 0);
+      brightnessOverlay.addColorStop(
         0,
-        0,
-        WIDTH,
-        HEIGHT
+        `rgba(${greyValue},${greyValue},${greyValue},0.72)`
       );
+      brightnessOverlay.addColorStop(
+        1,
+        `rgba(${greyValue},${greyValue},${greyValue},0.28)`
+      );
+      context.fillStyle = brightnessOverlay;
+      context.fillRect(0, 0, WIDTH, HEIGHT);
 
       drawBrightnessGraph(greyValue);
       drawBrightnessRunAverage(greyValue);
@@ -1926,22 +2147,7 @@
       const panelX = WIDTH - panelWidth - 28;
       const panelY = 28;
 
-      context.fillStyle = panelBackground;
-      context.fillRect(
-        panelX,
-        panelY,
-        panelWidth,
-        panelHeight
-      );
-
-      context.strokeStyle = foreground;
-      context.lineWidth = 1;
-      context.strokeRect(
-        panelX,
-        panelY,
-        panelWidth,
-        panelHeight
-      );
+      drawGlassPanel(panelX, panelY, panelWidth, panelHeight, 16);
 
       context.fillStyle = foreground;
       context.textAlign = "right";
@@ -1976,22 +2182,7 @@
           ? "#ffffff"
           : "#f0f6fc";
 
-      context.fillStyle = graphBackground;
-      context.fillRect(
-        graphX,
-        graphY,
-        graphWidth,
-        graphHeight
-      );
-
-      context.strokeStyle = graphForeground;
-      context.lineWidth = 1;
-      context.strokeRect(
-        graphX,
-        graphY,
-        graphWidth,
-        graphHeight
-      );
+      drawGlassPanel(graphX, graphY, graphWidth, graphHeight, 18);
 
       context.strokeStyle =
         "rgba(180,180,180,0.3)";
@@ -2253,23 +2444,10 @@
 
 
     function fitCanvasToAvailableSpace() {
-      const rect = canvas.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-
-      const targetRatio = WIDTH / HEIGHT;
-      let cssWidth = rect.width;
-      let cssHeight = rect.height;
-
-      if (cssWidth / cssHeight > targetRatio) {
-        cssWidth = cssHeight * targetRatio;
-      } else {
-        cssHeight = cssWidth / targetRatio;
-      }
-
-      canvas.style.width = `${cssWidth}px`;
-      canvas.style.height = `${cssHeight}px`;
-      canvas.style.justifySelf = "center";
-      canvas.style.alignSelf = "center";
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      canvas.style.justifySelf = "stretch";
+      canvas.style.alignSelf = "stretch";
     }
 
     window.addEventListener("resize", fitCanvasToAvailableSpace);
