@@ -42,7 +42,11 @@
           </button>
         </div>
 
-        <span id="choiceStatus">Loading quantum data…</span>
+        <button id="savedRunsButton" class="saved-runs-button" type="button">
+          Saved runs
+        </button>
+
+        <span id="choiceStatus">Loading quantum data...</span>
         <small>Version 1.5.3</small>
 
       </div>
@@ -57,7 +61,7 @@
           <button id="startButton" type="button">Start</button>
 
           <button id="restartButton" class="secondary" type="button">
-            Restart
+            Stop and save
           </button>
 
           <button id="menuButton" class="menu" type="button">
@@ -65,7 +69,7 @@
           </button>
 
           <span id="status" class="status">
-            Loading quantum data…
+            Loading quantum data...
           </span>
         </div>
 
@@ -75,15 +79,41 @@
         </section>
 
         <div class="info">
-          <span id="modeInfo">Mode: —</span>
+          <span id="modeInfo">Mode: -</span>
           <span id="bufferInfo">Buffer: 0</span>
           <span id="counterInfo">Count: 0</span>
           <span id="requestInfo">No batch yet</span>
-          <span id="nextRequestInfo">Next request: —</span>
+          <span id="nextRequestInfo">Next request: -</span>
           <span>Version 1.5.3</span>
         </div>
       </aside>
 
+    </section>
+
+    <section id="savedRunsScreen" class="saved-runs-screen" hidden>
+      <div class="saved-runs-shell">
+        <header class="saved-runs-header">
+          <div>
+            <h1>Saved Runs</h1>
+            <p>Select a run to view its statistics.</p>
+          </div>
+          <button id="savedBackButton" class="menu" type="button">
+            Back to menu
+          </button>
+        </header>
+
+        <div class="saved-runs-layout">
+          <section class="saved-list-panel">
+            <h2>Runs</h2>
+            <div id="savedRunsList" class="saved-runs-list"></div>
+          </section>
+
+          <section class="stats-panel saved-details-panel">
+            <h2 id="savedRunTitle">No run selected</h2>
+            <div id="savedRunStats" class="stats-grid"></div>
+          </section>
+        </div>
+      </div>
     </section>
 
   </main>
@@ -119,10 +149,13 @@
 
     const choiceScreen = document.getElementById("choiceScreen");
     const experimentScreen = document.getElementById("experimentScreen");
+    const savedRunsScreen = document.getElementById("savedRunsScreen");
 
     const chooseWalkButton = document.getElementById("chooseWalkButton");
     const chooseWaterfallButton = document.getElementById("chooseWaterfallButton");
     const chooseBrightnessButton = document.getElementById("chooseBrightnessButton");
+    const savedRunsButton = document.getElementById("savedRunsButton");
+    const savedBackButton = document.getElementById("savedBackButton");
 
     const choiceStatus = document.getElementById("choiceStatus");
     const startButton = document.getElementById("startButton");
@@ -138,6 +171,9 @@
 
     const statsTitle = document.getElementById("statsTitle");
     const statsGrid = document.getElementById("statsGrid");
+    const savedRunsList = document.getElementById("savedRunsList");
+    const savedRunTitle = document.getElementById("savedRunTitle");
+    const savedRunStats = document.getElementById("savedRunStats");
 
     const canvas = document.getElementById("arena");
     const context = canvas.getContext("2d");
@@ -163,6 +199,8 @@
     let previousFrameTime = 0;
     let accumulatedTime = 0;
     let ballSpawnAccumulator = 0;
+    let savedRuns = [];
+    let selectedSavedRunId = null;
 
     const walker = {
       x: WIDTH / 2,
@@ -230,63 +268,41 @@
         : "0.00%";
     }
 
-    function updateStatistics() {
-      if (currentMode === "walk") {
-        statsTitle.textContent =
-          "Average Proximity to the Four Edges";
+    function getModeName(mode) {
+      if (mode === "walk") {
+        return "Random Walk";
+      }
 
-        statsGrid.innerHTML = [
-          createStat(
-            "Top edge",
-            averageProximity(
-              walker.proximitySum.top,
-              walker.steps
-            )
-          ),
-          createStat(
-            "Right edge",
-            averageProximity(
-              walker.proximitySum.right,
-              walker.steps
-            )
-          ),
-          createStat(
-            "Bottom edge",
-            averageProximity(
-              walker.proximitySum.bottom,
-              walker.steps
-            )
-          ),
-          createStat(
-            "Left edge",
-            averageProximity(
-              walker.proximitySum.left,
-              walker.steps
-            )
-          ),
-          createStat(
-            "Closest to top",
-            `${walker.minimumDistance.top.toFixed(1)} px`
-          ),
-          createStat(
-            "Closest to right",
-            `${walker.minimumDistance.right.toFixed(1)} px`
-          ),
-          createStat(
-            "Closest to bottom",
-            `${walker.minimumDistance.bottom.toFixed(1)} px`
-          ),
-          createStat(
-            "Closest to left",
-            `${walker.minimumDistance.left.toFixed(1)} px`
-          )
-        ].join("");
+      if (mode === "waterfall") {
+        return "Ball Waterfall";
+      }
+
+      if (mode === "brightness") {
+        return "Brightness Walk";
+      }
+
+      return "Unknown";
+    }
+
+    function getCurrentRunSnapshot() {
+      if (currentMode === "walk") {
+        return {
+          title: "Average Proximity to the Four Edges",
+          summary: `${walker.steps} steps`,
+          stats: [
+            ["Top edge", averageProximity(walker.proximitySum.top, walker.steps)],
+            ["Right edge", averageProximity(walker.proximitySum.right, walker.steps)],
+            ["Bottom edge", averageProximity(walker.proximitySum.bottom, walker.steps)],
+            ["Left edge", averageProximity(walker.proximitySum.left, walker.steps)],
+            ["Closest to top", `${walker.minimumDistance.top.toFixed(1)} px`],
+            ["Closest to right", `${walker.minimumDistance.right.toFixed(1)} px`],
+            ["Closest to bottom", `${walker.minimumDistance.bottom.toFixed(1)} px`],
+            ["Closest to left", `${walker.minimumDistance.left.toFixed(1)} px`]
+          ]
+        };
       }
 
       if (currentMode === "brightness") {
-        statsTitle.textContent =
-          "Brightness During Current Run";
-
         const sampleCount =
           brightnessWalk.steps + 1;
 
@@ -294,46 +310,23 @@
           brightnessWalk.brightnessSum /
           sampleCount;
 
-        statsGrid.innerHTML = [
-          createStat(
-            "Current",
-            `${brightnessWalk.brightness.toFixed(2)}%`
-          ),
-          createStat(
-            "Average",
-            `${average.toFixed(2)}%`
-          ),
-          createStat(
-            "Minimum",
-            `${brightnessWalk.minimumBrightness.toFixed(2)}%`
-          ),
-          createStat(
-            "Maximum",
-            `${brightnessWalk.maximumBrightness.toFixed(2)}%`
-          ),
-          createStat(
-            "2D Position X",
-            `${brightnessWalk.x.toFixed(1)} px`
-          ),
-          createStat(
-            "2D Position Y",
-            `${brightnessWalk.y.toFixed(1)} px`
-          ),
-          createStat(
-            "Steps",
-            brightnessWalk.steps
-          ),
-          createStat(
-            "Starting Value",
-            `${INITIAL_BRIGHTNESS}%`
-          )
-        ].join("");
+        return {
+          title: "Brightness During Current Run",
+          summary: `${brightnessWalk.steps} steps`,
+          stats: [
+            ["Current", `${brightnessWalk.brightness.toFixed(2)}%`],
+            ["Average", `${average.toFixed(2)}%`],
+            ["Minimum", `${brightnessWalk.minimumBrightness.toFixed(2)}%`],
+            ["Maximum", `${brightnessWalk.maximumBrightness.toFixed(2)}%`],
+            ["2D Position X", `${brightnessWalk.x.toFixed(1)} px`],
+            ["2D Position Y", `${brightnessWalk.y.toFixed(1)} px`],
+            ["Steps", brightnessWalk.steps],
+            ["Starting Value", `${INITIAL_BRIGHTNESS}%`]
+          ]
+        };
       }
 
       if (currentMode === "waterfall") {
-        statsTitle.textContent =
-          "Ball Distribution During Current Run";
-
         const total =
           waterfall.completedBalls;
 
@@ -362,17 +355,44 @@
             ? weightedSum / total
             : 0;
 
-        statsGrid.innerHTML = [
-          createStat("Total", total),
-          createStat("Left", percentage(leftCount, total)),
-          createStat("Center", percentage(centerCount, total)),
-          createStat("Right", percentage(rightCount, total)),
-          createStat("Averagee bak", averageBin.toFixed(2)),
-          createStat("Number of Bins", waterfall.bins.length),
-          createStat("Most Filled", Math.max(0, ...waterfall.bins)),
-          createStat("Active Balls", waterfall.balls.length)
-        ].join("");
+        return {
+          title: "Ball Distribution During Current Run",
+          summary: `${total} completed balls`,
+          stats: [
+            ["Total", total],
+            ["Left", percentage(leftCount, total)],
+            ["Center", percentage(centerCount, total)],
+            ["Right", percentage(rightCount, total)],
+            ["Average bin", averageBin.toFixed(2)],
+            ["Number of Bins", waterfall.bins.length],
+            ["Most Filled", Math.max(0, ...waterfall.bins)],
+            ["Active Balls", waterfall.balls.length]
+          ]
+        };
       }
+
+      return {
+        title: "Current Run Statistics",
+        summary: "No active run",
+        stats: []
+      };
+    }
+
+    function renderStats(stats) {
+      return stats
+        .map(([label, value]) => createStat(label, value))
+        .join("");
+    }
+
+    function updateStatistics() {
+      const snapshot =
+        getCurrentRunSnapshot();
+
+      statsTitle.textContent =
+        snapshot.title;
+
+      statsGrid.innerHTML =
+        renderStats(snapshot.stats);
     }
 
     function updateInterface() {
@@ -405,20 +425,126 @@
 
       if (requestBusy) {
         choiceStatus.textContent = localFallbackActive
-          ? "Local random active · fetching quantum data…"
-          : "Fetching quantum data…";
+          ? "Local random active - fetching quantum data..."
+          : "Fetching quantum data...";
       } else if (quantumBuffer.length > 0) {
         choiceStatus.textContent =
-          `Quantum data ready · buffer ${quantumBuffer.length}`;
+          `Quantum data ready - buffer ${quantumBuffer.length}`;
       } else if (lastRequestError || localFallbackActive) {
         choiceStatus.textContent =
-          "Local JavaScript random active · QRNG retry scheduled";
+          "Local JavaScript random active - QRNG retry scheduled";
       } else {
         choiceStatus.textContent =
-          "Waiting for quantum data…";
+          "Waiting for quantum data...";
       }
 
       updateStatistics();
+    }
+
+    function renderSavedRuns() {
+      if (savedRuns.length === 0) {
+        savedRunsList.innerHTML =
+          `<p class="empty-state">No saved runs yet.</p>`;
+        savedRunTitle.textContent =
+          "No run selected";
+        savedRunStats.innerHTML = "";
+        return;
+      }
+
+      savedRunsList.innerHTML = savedRuns
+        .map(run => `
+          <button
+            class="saved-run-item${run.id === selectedSavedRunId ? " is-selected" : ""}"
+            type="button"
+            data-run-id="${run.id}"
+          >
+            <strong>${run.name}</strong>
+            <span>${run.savedAtLabel}</span>
+            <small>${run.summary}</small>
+          </button>
+        `)
+        .join("");
+
+      const selectedRun =
+        savedRuns.find(run => run.id === selectedSavedRunId) ||
+        savedRuns[0];
+
+      selectedSavedRunId =
+        selectedRun.id;
+
+      savedRunTitle.textContent =
+        selectedRun.name;
+
+      savedRunStats.innerHTML =
+        renderStats(selectedRun.stats);
+    }
+
+    function showSavedRuns() {
+      running = false;
+      currentMode = null;
+
+      cancelAnimationFrame(animationFrame);
+
+      choiceScreen.hidden = true;
+      experimentScreen.hidden = true;
+      savedRunsScreen.hidden = false;
+
+      startButton.textContent =
+        "Start";
+
+      renderSavedRuns();
+    }
+
+    function saveCurrentRun() {
+      if (currentMode === null) {
+        return false;
+      }
+
+      const snapshot =
+        getCurrentRunSnapshot();
+
+      if (snapshot.stats.length === 0) {
+        return false;
+      }
+
+      const savedAt =
+        Date.now();
+
+      const run = {
+        id: String(savedAt),
+        name: `${getModeName(currentMode)} #${savedRuns.length + 1}`,
+        mode: currentMode,
+        savedAt,
+        savedAtLabel: new Date(savedAt).toLocaleString(),
+        summary: snapshot.summary,
+        stats: snapshot.stats
+      };
+
+      savedRuns.unshift(run);
+      selectedSavedRunId = run.id;
+
+      return true;
+    }
+
+    function stopAndSaveCurrentRun() {
+      const saved =
+        saveCurrentRun();
+
+      running = false;
+      wasRunningBeforeEmpty = false;
+
+      cancelAnimationFrame(animationFrame);
+
+      statusElement.textContent =
+        saved
+          ? "Run saved"
+          : "Nothing to save yet";
+
+      resetCurrentExperiment();
+
+      if (saved) {
+        showSavedRuns();
+      }
     }
 
     function clearRequestTimer() {
@@ -460,7 +586,7 @@
       lastRequestError = null;
 
       statusElement.textContent =
-        "Fetching quantum data…";
+        "Fetching quantum data...";
 
       updateInterface();
 
@@ -503,7 +629,7 @@
 
         statusElement.textContent =
           running
-            ? "Experiment active · ANU quantum data"
+            ? "Experiment active - ANU quantum data"
             : "Quantum data ready";
 
         updateInterface();
@@ -537,8 +663,8 @@
 
         statusElement.textContent =
           quantumBuffer.length > 0
-            ? "QRNG error · existing quantum buffer active"
-            : "QRNG error · local JavaScript random active";
+            ? "QRNG error - existing quantum buffer active"
+            : "QRNG error - local JavaScript random active";
 
         scheduleRequestAt(
           nextRequestAllowedAt
@@ -582,7 +708,7 @@
         localFallbackCount++;
 
         statusElement.textContent =
-          "Experiment active · local JavaScript random";
+          "Experiment active - local JavaScript random";
 
         updateInterface();
         return createLocalRandomUint16();
@@ -605,6 +731,7 @@
       cancelAnimationFrame(animationFrame);
 
       experimentScreen.hidden = true;
+      savedRunsScreen.hidden = true;
       choiceScreen.hidden = false;
 
       startButton.textContent =
@@ -617,6 +744,7 @@
       currentMode = mode;
 
       choiceScreen.hidden = true;
+      savedRunsScreen.hidden = true;
       experimentScreen.hidden = false;
 
       if (mode === "walk") {
@@ -624,10 +752,10 @@
           "Mode: Random Walk";
       } else if (mode === "waterfall") {
         modeInfo.textContent =
-          "Modus: Ball Waterfall";
+          "Mode: Ball Waterfall";
       } else {
         modeInfo.textContent =
-          "Modus: Brightness via 2D-walk";
+          "Mode: Brightness via 2D walk";
       }
 
       resetCurrentExperiment();
@@ -1355,7 +1483,7 @@
       statusElement.textContent =
         quantumBuffer.length > 0
           ? "Quantum data ready"
-          : "Quantumdata laden · lokale fallback available";
+          : "Loading quantum data - local fallback available";
 
       updateInterface();
       drawCurrentMode();
@@ -1382,8 +1510,8 @@
       startButton.textContent = "Pause";
       statusElement.textContent =
         quantumBuffer.length > 0
-          ? "Experiment active · ANU quantum data"
-          : "Experiment active · local JavaScript random";
+          ? "Experiment active - ANU quantum data"
+          : "Experiment active - local JavaScript random";
 
       previousFrameTime = 0;
 
@@ -1408,6 +1536,33 @@
       () => showExperiment("brightness")
     );
 
+    savedRunsButton.addEventListener(
+      "click",
+      showSavedRuns
+    );
+
+    savedBackButton.addEventListener(
+      "click",
+      showMenu
+    );
+
+    savedRunsList.addEventListener(
+      "click",
+      event => {
+        const item =
+          event.target.closest(".saved-run-item");
+
+        if (!item) {
+          return;
+        }
+
+        selectedSavedRunId =
+          item.dataset.runId;
+
+        renderSavedRuns();
+      }
+    );
+
     startButton.addEventListener(
       "click",
       async () => {
@@ -1417,7 +1572,7 @@
 
           cancelAnimationFrame(animationFrame);
 
-          startButton.textContent = "Start";
+          startButton.textContent = "Resume";
           statusElement.textContent = "Paused";
           return;
         }
@@ -1428,10 +1583,7 @@
 
     restartButton.addEventListener(
       "click",
-      async () => {
-        resetCurrentExperiment();
-        await startExperiment();
-      }
+      stopAndSaveCurrentRun
     );
 
     menuButton.addEventListener(
